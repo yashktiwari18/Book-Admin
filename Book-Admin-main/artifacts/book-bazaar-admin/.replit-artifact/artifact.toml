@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "Book Bazaar Admin"
+description = "A frontend-only administration dashboard for Book Bazaar, where staff manage customer accounts, publication access, book listings, offers, and inventory."
+version = "1.0.0"
+id = "artifacts/book-bazaar-admin"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 20822
+
+[services.development]
+run = "pnpm --filter @workspace/book-bazaar-admin run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/book-bazaar-admin", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/book-bazaar-admin/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "20822"
+BASE_PATH = "/"
