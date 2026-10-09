@@ -1,0 +1,11 @@
+const fs = require('fs');
+const path = 'src/App.tsx';
+let c = fs.readFileSync(path, 'utf8');
+
+const target = `<div className="field full"><label>Approved publications</label><div className="checks">{pubs.map(p=><label className="check-pill" key={p}><input type="checkbox" checked={values.allowedPublications.includes(p)} onChange={e=>set('allowedPublications',e.target.checked?[...values.allowedPublications,p]:values.allowedPublications.filter((x:string)=>x!==p))}/>{p}</label>)}</div><span className="muted">Families can only purchase titles from selected publishers.</span></div>`;
+
+const replacement = `<div className="field full"><label>Assign specific books</label><div style={{display:'flex',gap:8,marginBottom:8}}><select style={{flex:1}} value={selClass} onChange={e=>{setSelClass(e.target.value);setSelPub('');setSelBook('');}}><option value="">Select Class</option>{Array.from({length:12},(_,i)=>\`Class \${i+1}\`).map(x=><option key={x}>{x}</option>)}</select><select style={{flex:1}} value={selPub} onChange={e=>{setSelPub(e.target.value);setSelBook('');}} disabled={!selClass}><option value="">Select Publication</option>{Array.from(new Set(data.books.filter(b=>b.className===selClass).map(b=>b.publication))).map(p=><option key={p}>{p}</option>)}</select><select style={{flex:1}} value={selBook} onChange={e=>setSelBook(e.target.value)} disabled={!selPub}><option value="">Select Book</option>{data.books.filter(b=>b.className===selClass&&b.publication===selPub).map(b=><option key={b.id} value={b.id}>{b.title}</option>)}</select><button type="button" className="btn" disabled={!selBook} onClick={()=>{if(!values.allowedBooks?.includes(selBook))set('allowedBooks',[...(values.allowedBooks||[]),selBook]);setSelBook('');}}>Add</button></div><div className="checks">{(values.allowedBooks||[]).map((id:string)=>{const b=data.books.find(x=>x.id===id);return <label className="check-pill" key={id}><input type="checkbox" checked onChange={()=>set('allowedBooks',values.allowedBooks.filter((x:string)=>x!==id))}/>{b?.title||id}</label>})}</div><span className="muted">Families can only purchase these selected titles.</span></div>`;
+
+c = c.replace(target, replacement);
+fs.writeFileSync(path, c);
+console.log("Replaced successfully!");
