@@ -12,7 +12,7 @@ type Book = { id:string; title:string; author:string; publication:string; subjec
 type Offer = { id:string; title:string; bookIds:string[]; discountPercent:number; startDate:string; endDate:string; status:'Active'|'Scheduled'|'Ended' };
 type Purchase = { id:string; manufacturer:string; bookId:string; qtyPurchased:number; qtySold:number; amountPaid:number; amountDue:number; status:'Paid'|'Partial'|'Pending'; date:string };
 type Dataset = { customers:Customer[]; books:Book[]; offers:Offer[]; purchases:Purchase[] };
-type FormState = { kind:'customer'|'book'|'offer'|'stock'|'purchase'; item?:Customer|Book|Offer; book?:Book } | null;
+type FormState = { kind:'customer'|'book'|'offer'|'stock'|'purchase'; item?:Customer|Book|Offer|Purchase; book?:Book } | null;
 
 const pubs=['RD Sharma','R.S. Aggarwal','NCERT','Arihant Publications','S. Chand'];
 const today='2025-02-14';
@@ -71,7 +71,7 @@ function AppContent(){
   const [data,setData]=useState<Dataset>(readStore); const [form,setForm]=useState<FormState>(null); const [toast,setToast]=useState(''); const [confirm,setConfirm]=useState<{kind:'customer'|'book'|'offer'|'purchase';id:string;name:string}|null>(null);
   useEffect(()=>{localStorage.setItem('bookbazaar-admin-v1',JSON.stringify(data));},[data]);
   useEffect(()=>{if(!toast)return undefined;const timer=setTimeout(()=>setToast(''),2800);return()=>clearTimeout(timer);},[toast]);
-  const save=(kind:'customer'|'book'|'offer'|'stock',values:Record<string,any>,original?:Customer|Book|Offer)=>{
+  const save=(kind:'customer'|'book'|'offer'|'stock'|'purchase',values:Record<string,any>,original?:Customer|Book|Offer)=>{
     if(kind==='customer'){const item={...values,id:original?.id||idFor('BB'),joinedAt:(original as Customer)?.joinedAt||today} as Customer;setData(d=>({...d,customers:original?d.customers.map(x=>x.id===item.id?item:x):[item,...d.customers]}));setToast(original?'Customer details saved':'Customer account created');}
     if(kind==='book'){const item={...values,id:original?.id||idFor('BK')} as Book;setData(d=>({...d,books:original?d.books.map(x=>x.id===item.id?item:x):[item,...d.books]}));setToast(original?'Book details saved':'Book added to catalog');}
     if(kind==='offer'){const item={...values,id:original?.id||idFor('OF')} as Offer;setData(d=>({...d,offers:original?d.offers.map(x=>x.id===item.id?item:x):[item,...d.offers]}));setToast(original?'Offer updated':'Offer created');}
@@ -99,7 +99,7 @@ function AppContent(){
   </AppShell>;
 }
 
-type Context={data:Dataset;setForm:(form:FormState)=>void;edit:(kind:'customer'|'book'|'offer'|'purchase',item?:Customer|Book|Offer)=>void;setConfirm:(item:{kind:'customer'|'book'|'offer'|'purchase';id:string;name:string}|null)=>void;setToast:(msg:string)=>void;endOffer:(id:string)=>void};
+type Context={data:Dataset;setForm:(form:FormState)=>void;edit:(kind:'customer'|'book'|'offer'|'purchase',item?:Customer|Book|Offer|Purchase)=>void;setConfirm:(item:{kind:'customer'|'book'|'offer'|'purchase';id:string;name:string}|null)=>void;setToast:(msg:string)=>void;endOffer:(id:string)=>void};
 function Heading({eyebrow,title,subtitle,children}:{eyebrow:string;title:string;subtitle:string;children?:ReactNode}){return <div className="page-heading"><div><div className="eyebrow">{eyebrow}</div><h1>{title}</h1><p className="subhead">{subtitle}</p></div>{children&&<div className="heading-actions">{children}</div>}</div>}
 function Stat({label,value,note,Icon,tint='green'}:{label:string;value:string|number;note:string;Icon:any;tint?:string}){return <div className="panel stat-card"><div className="stat-top"><span>{label}</span><span className={`stat-icon ${tint}`}><Icon/></span></div><div className="stat-value">{value}</div><div className="stat-note">{note}</div></div>}
 function Pill({children,state}:{children:ReactNode;state?:string}){const cls=state==='Pending'||state==='Draft'||state==='Scheduled'?'warn':state==='Inactive'||state==='Ended'||state==='Out of stock'?'neutral':state==='Low stock'?'red':'';return <span className={`pill ${cls}`}>{children}</span>}
