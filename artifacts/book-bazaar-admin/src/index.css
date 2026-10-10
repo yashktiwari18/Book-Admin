@@ -54,3 +54,12 @@
 @keyframes appear { from { opacity:0; transform:translateY(7px) } to { opacity:1; transform:translateY(0) } } @keyframes fade { from { opacity:0 } to {opacity:1} } @keyframes modalIn { from { opacity:0; transform:translateY(9px) scale(.99) } to { opacity:1; transform:translateY(0) scale(1) } } @keyframes grow { from { transform:scaleY(.35) } to { transform:scaleY(1) } }
 @media(max-width:980px) { .sidebar { width:215px; }.page { padding:28px 25px 45px; }.topbar { padding:0 25px; }.stat-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }.overview-grid { grid-template-columns:1fr; } }
 @media(max-width:700px) { .sidebar { position:fixed;z-index:30;left:-260px;top:0;transition:left .24s;width:248px;box-shadow:15px 0 35px #18392722; }.sidebar.open { left:0; }.mobile-scrim { position:fixed;inset:0;z-index:25;background:#13241d66; }.menu-button { display:grid;place-items:center; }.topbar { height:60px;padding:0 16px; }.top-actions .today { display:none; }.page { padding:24px 15px 38px; }.page-heading { align-items:flex-start;flex-direction:column;gap:16px;margin-bottom:20px; }.heading-actions { width:100%; }.heading-actions .btn { flex:1; }.stat-grid { gap:9px; }.stat-card { padding:14px; }.stat-value { font-size:25px;margin-top:11px; }.stat-top { font-size:10px; }.panel-pad { padding:15px; }.form-grid { grid-template-columns:1fr; }.field.full { grid-column:auto; }.toolbar { gap:7px; }.search-box { min-width:100%;max-width:none; }.filter-select { flex:1;min-width:100px; }.data-table { min-width:600px; }.mobile-nav { display:block; position:fixed;bottom:0;left:0;right:0;z-index:15;background:#fbfaf5;border-top:1px solid #e5e0d4;padding:7px 5px calc(7px + env(safe-area-inset-bottom)); }.mobile-nav-inner { display:flex;justify-content:space-around; }.mobile-nav a { display:flex;flex-direction:column;align-items:center;gap:3px;text-decoration:none;color:#7d877e;font-size:9px;padding:4px; }.mobile-nav a.active { color:#244c38;font-weight:700; }.mobile-nav svg { width:17px;height:17px; }.page { padding-bottom:86px; }.top-left .crumb { display:none; } }
+
+@media print {
+  body * { visibility: hidden; }
+  .print-section, .print-section * { visibility: visible; }
+  .print-section { position: absolute; left: 0; top: 0; width: 100%; }
+  .no-print { display: none !important; }
+  .print-only { display: inline-block !important; }
+}
+.print-only { display: none; }

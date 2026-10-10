@@ -12,7 +12,7 @@ type Book = { id:string; title:string; author:string; publication:string; subjec
 type Offer = { id:string; title:string; bookIds:string[]; discountPercent:number; startDate:string; endDate:string; status:'Active'|'Scheduled'|'Ended' };
 type Purchase = { id:string; manufacturer:string; bookId:string; qtyPurchased:number; qtySold:number; amountPaid:number; amountDue:number; status:'Paid'|'Partial'|'Pending'; date:string };
 type Dataset = { customers:Customer[]; books:Book[]; offers:Offer[]; purchases:Purchase[] };
-type FormState = { kind:'customer'|'book'|'offer'|'stock'|'purchase'; item?:Customer|Book|Offer|Purchase; book?:Book } | null;
+type FormState = { kind:'customer'|'book'|'offer'|'stock'|'purchase'|'bill'; item?:Customer|Book|Offer|Purchase; book?:Book } | null;
 
 const pubs=['RD Sharma','R.S. Aggarwal','NCERT','Arihant Publications','S. Chand'];
 const today='2025-02-14';
@@ -93,7 +93,8 @@ function AppContent(){
       <Route path="/purchases"><Purchases {...context}/></Route>
       <Route component={NotFound}/>
     </Switch>
-    {form&&<Editor form={form} data={data} onClose={()=>setForm(null)} onSave={save}/>}
+    {form&&form.kind!=='bill'&&<Editor form={form} data={data} onClose={()=>setForm(null)} onSave={save}/>}
+    {form&&form.kind==='bill'&&<BillingModal data={data} onClose={()=>setForm(null)}/>}
     {confirm&&<div className="modal-backdrop" role="presentation"><div className="modal" role="dialog" aria-modal="true"><div className="modal-head"><div><h2>Remove this {confirm.kind}?</h2><p>This action cannot be undone.</p></div><button className="icon-button" onClick={()=>setConfirm(null)} aria-label="Close"><X/></button></div><div className="modal-body"><p style={{fontSize:13,color:'#536157',lineHeight:1.6}}>You’re about to remove <b>{confirm.name}</b>. It will no longer appear in your workspace.</p></div><div className="modal-foot"><button className="btn" onClick={()=>setConfirm(null)}>Keep it</button><button className="btn danger" onClick={remove}><Trash2/> Remove</button></div></div></div>}
     {toast&&<div className="toast" role="status" data-testid="status-feedback"><Check size={15} style={{verticalAlign:'middle',marginRight:8}}/>{toast}</div>}
   </AppShell>;
@@ -152,7 +153,7 @@ function Purchases(c:Context){
   <div className="toolbar"><SearchBar value={query} onChange={setQuery} placeholder="Search wholesaler..."/><select className="filter-select" value={filter} onChange={e=>setFilter(e.target.value)}><option>All purchases</option><option>Paid</option><option>Partial</option><option>Pending</option></select></div>
   <section className="panel"><div className="table-wrap"><table className="data-table"><thead><tr><th>Wholesaler Name</th><th>Book / Date</th><th>Books Purchased</th><th>Current Stock</th><th>Amount Paid</th><th>Amount Due</th><th>Status</th><th></th></tr></thead><tbody>{rows.map(p=>{
     const b=c.data.books.find(x=>x.id===p.bookId);
-    return <tr key={p.id}><td><b>{p.manufacturer}</b><div className="muted">{p.id}</div></td><td>{b?.title||p.bookId}<div className="muted">{p.date}</div></td><td>{p.qtyPurchased}</td><td><b style={{color:'#a9663b'}}>{b?.stock} left</b></td><td>{money(p.amountPaid)}</td><td><b style={{color:p.amountDue>0?'#a24840':''}}>{money(p.amountDue)}</b></td><td><Pill state={p.status}>{p.status}</Pill></td><td><div className="row-actions"><button className="icon-button" onClick={()=>c.edit('purchase',p)}><Pencil/></button><button className="icon-button" onClick={()=>c.setConfirm({kind:'purchase',id:p.id,name:p.id})}><Trash2/></button></div></td></tr>
+    return <tr key={p.id}><td><b>{p.manufacturer}</b><div className="muted">{p.id}</div></td><td>{b?.title||p.bookId}<div className="muted">{p.date}</div></td><td>{p.qtyPurchased}</td><td><b style={{color:'#a9663b'}}>{b?.stock} left</b></td><td>{money(p.amountPaid)}</td><td><b style={{color:p.amountDue>0?'#a24840':''}}>{money(p.amountDue)}</b></td><td><Pill state={p.status}>{p.status}</Pill></td><td><div className="row-actions"><button className="icon-button" title="Generate Bill" onClick={()=>c.setForm({kind:'bill', item:p})}><Plus/></button><button className="icon-button" onClick={()=>c.setConfirm({kind:'purchase',id:p.id,name:p.id})}><Trash2/></button></div></td></tr>
   })}</tbody></table>{!rows.length&&<TableEmpty label="No purchases found" detail="Record your first wholesaler purchase." Icon={Truck}/>}</div></section></main>
 }
 
@@ -190,6 +191,107 @@ function Editor({form,data,onClose,onSave}:{form:Exclude<FormState,null>;data:Da
   {kind==='purchase'&&<div className="form-grid"><div className="field full"><label>Wholesaler Name *</label><input required value={values.manufacturer} onChange={e=>set('manufacturer',e.target.value)} placeholder="e.g. Apex Distributors"/></div><div className="field full"><label>Book</label><select required value={values.bookId} onChange={e=>set('bookId',e.target.value)}><option value="">Select a catalog book</option>{data.books.map(b=><option key={b.id} value={b.id}>{b.title} ({b.className})</option>)}</select></div><div className="field"><label>Qty Purchased</label><input type="number" required value={values.qtyPurchased} onChange={e=>set('qtyPurchased',e.target.value)}/></div><div className="field"><label>Amount Paid (₹)</label><input type="number" required value={values.amountPaid} onChange={e=>set('amountPaid',e.target.value)}/></div><div className="field"><label>Amount Due (₹)</label><input type="number" required value={values.amountDue} onChange={e=>set('amountDue',e.target.value)}/></div><div className="field"><label>Payment Status</label><select value={values.status} onChange={e=>set('status',e.target.value)}><option>Paid</option><option>Partial</option><option>Pending</option></select></div><div className="field"><label>Date</label><input type="date" required value={values.date} onChange={e=>set('date',e.target.value)}/></div></div>}
    {kind==='stock'&&<div><div style={{background:'#f0efe6',borderRadius:9,padding:14,marginBottom:17}}><div className="book-title">{form.book?.title}</div><div className="muted">{form.book?.publication} · {form.book?.sku} · Currently {form.book?.stock} units</div></div><div className="field"><label>Quantity change</label><input type="number" required value={values.delta} onChange={e=>set('delta',e.target.value)} placeholder="Use a negative number to record a sale or correction"/><span className="muted">Current quantity: {form.book?.stock}. New quantity cannot be below zero.</span></div><div style={{display:'flex',gap:8,marginTop:14}}><button className="btn" type="button" onClick={()=>set('delta',Number(values.delta)-1)}><Minus/> Remove one</button><button className="btn" type="button" onClick={()=>set('delta',Number(values.delta)+1)}><Plus/> Add one</button></div></div>}
  </div><div className="modal-foot"><button className="btn" type="button" onClick={onClose}>Cancel</button><button className="btn primary" type="submit"><Save/> {kind==='stock'?'Save adjustment':editing?'Save changes':kind==='offer'?'Create offer':kind==='purchase'?'Save purchase':kind==='book'?'Add book':'Create account'}</button></div></form></div>
+}
+
+function BillingModal({ onClose, data }: { onClose: () => void, data: Dataset }) {
+  const [items, setItems] = useState<{bookId:string; qty:number; price:number; discount:number}[]>([]);
+  const [selectedBook, setSelectedBook] = useState('');
+  const [qty, setQty] = useState(1);
+  const [discount, setDiscount] = useState(0);
+  const [overallDiscount, setOverallDiscount] = useState(0);
+
+  const addItem = () => {
+    if(!selectedBook) return;
+    const book = data.books.find(b=>b.id===selectedBook);
+    if(book) {
+      setItems([...items, { bookId: selectedBook, qty, price: book.price, discount }]);
+      setSelectedBook(''); setQty(1); setDiscount(0);
+    }
+  }
+  const removeItem = (index: number) => {
+    setItems(items.filter((_, i) => i !== index));
+  }
+
+  const subtotal = items.reduce((sum, item) => sum + (item.price * item.qty * (1 - item.discount/100)), 0);
+  const total = subtotal * (1 - overallDiscount/100);
+
+  const handlePrint = () => {
+    window.print();
+  }
+
+  return (
+    <div className="modal-backdrop" onMouseDown={e=>{if(e.target===e.currentTarget)onClose()}}>
+      <div className="modal print-section" style={{maxWidth: 700}} role="dialog" aria-modal="true">
+        <div className="modal-head no-print">
+          <div><h2>Generate Bill</h2><p>Add items and generate PDF bill for customer.</p></div>
+          <button type="button" className="icon-button" onClick={onClose}><X/></button>
+        </div>
+        <div className="modal-body">
+          <div className="form-grid no-print" style={{marginBottom: 20}}>
+            <div className="field full">
+               <label>Book</label>
+               <select value={selectedBook} onChange={e=>setSelectedBook(e.target.value)}>
+                 <option value="">Select a book...</option>
+                 {data.books.map(b=><option key={b.id} value={b.id}>{b.title} (₹{b.price})</option>)}
+               </select>
+            </div>
+            <div className="field"><label>Quantity</label><input type="number" min="1" value={qty} onChange={e=>setQty(Number(e.target.value))}/></div>
+            <div className="field"><label>Item Discount (%)</label><input type="number" min="0" max="100" value={discount} onChange={e=>setDiscount(Number(e.target.value))}/></div>
+            <div className="field" style={{display:'flex', alignItems:'flex-end'}}>
+               <button className="btn primary" type="button" onClick={addItem}><Plus/> Add Item</button>
+            </div>
+          </div>
+          
+          <hr className="no-print" style={{margin:'20px 0', borderColor:'#eee9df'}}/>
+
+          <div className="invoice-view" style={{padding: '0 10px'}}>
+             <h2 style={{fontFamily: 'var(--app-font-serif)', color: '#244331', borderBottom: '2px solid #244c38', paddingBottom: 10}}>Book Bazaar - Invoice</h2>
+             <div className="table-wrap" style={{ marginTop: 20 }}>
+               <table className="data-table" style={{width: '100%', minWidth: 500}}>
+                 <thead><tr><th>Item</th><th>Qty</th><th>Price</th><th>Discount</th><th>Total</th><th className="no-print"></th></tr></thead>
+                 <tbody>
+                   {items.map((item, i) => {
+                     const b = data.books.find(x=>x.id===item.bookId);
+                     const rowTotal = item.price * item.qty * (1 - item.discount/100);
+                     return <tr key={i}>
+                       <td>{b?.title}</td>
+                       <td>{item.qty}</td>
+                       <td>₹{item.price}</td>
+                       <td>{item.discount}%</td>
+                       <td>₹{rowTotal.toFixed(2)}</td>
+                       <td className="no-print"><div className="row-actions"><button className="icon-button" onClick={()=>removeItem(i)}><Trash2/></button></div></td>
+                     </tr>
+                   })}
+                   {items.length === 0 && <tr className="no-print"><td colSpan={6} style={{textAlign:'center', padding:20}}>No items added yet.</td></tr>}
+                 </tbody>
+               </table>
+             </div>
+             <div style={{display:'flex', justifyContent:'flex-end', marginTop: 20}}>
+               <div style={{width: 300}}>
+                  <div style={{display:'flex', justifyContent:'space-between', marginBottom: 10, fontSize: 13}}>
+                     <span style={{color: '#526056'}}>Subtotal:</span>
+                     <span>₹{subtotal.toFixed(2)}</span>
+                  </div>
+                  <div style={{display:'flex', justifyContent:'space-between', marginBottom: 10, alignItems:'center', fontSize: 13}}>
+                     <span style={{color: '#526056'}}>Overall Discount (%):</span>
+                     <input className="no-print" type="number" min="0" max="100" style={{width: 60, padding: 4, borderRadius: 4, border: '1px solid #ccc'}} value={overallDiscount} onChange={e=>setOverallDiscount(Number(e.target.value))} />
+                     <span className="print-only">{overallDiscount}%</span>
+                  </div>
+                  <div style={{display:'flex', justifyContent:'space-between', fontSize: 18, fontWeight: 'bold', borderTop: '1px solid #e9e4d9', paddingTop: 12, color: '#223e2e'}}>
+                     <span>Total:</span>
+                     <span>₹{total.toFixed(2)}</span>
+                  </div>
+               </div>
+             </div>
+          </div>
+        </div>
+        <div className="modal-foot no-print">
+          <button className="btn" type="button" onClick={onClose}>Cancel</button>
+          <button className="btn primary" type="button" onClick={handlePrint}>Print / Save PDF</button>
+        </div>
+      </div>
+    </div>
+  )
 }
 
 function RoutedErrorBoundary({children}:{children:ReactNode}){const [location]=useLocation();return <ErrorBoundary resetKey={location}>{children}</ErrorBoundary>}

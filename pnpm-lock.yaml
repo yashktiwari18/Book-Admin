@@ -162,6 +162,18 @@ importers:
         specifier: ^0.4.3
         version: 0.4.3
     devDependencies:
+      '@esbuild/win32-x64':
+        specifier: ^0.28.2
+        version: 0.28.2
+      '@rollup/rollup-win32-x64-msvc':
+        specifier: ^4.64.3
+        version: 4.64.3
+      '@tailwindcss/oxide-win32-x64-msvc':
+        specifier: ^4.3.3
+        version: 4.3.3
+      lightningcss-win32-x64-msvc:
+        specifier: ^1.33.0
+        version: 1.33.0
       prettier:
         specifier: ^3.9.6
         version: 3.9.9
@@ -606,7 +618,7 @@ importers:
     devDependencies:
       orval:
         specifier: ^8.30.0
-        version: 8.40.0(@tanstack/react-query@5.104.1)(prettier@3.9.9)(typescript@5.9.3)(zod@4.6.5)
+        version: 8.40.0(@tanstack/react-query@5.104.1(react@19.1.0))(prettier@3.9.9)(typescript@5.9.3)(zod@4.6.5)
 
   lib/api-zod:
     dependencies:
@@ -753,6 +765,12 @@ packages:
     engines: {node: '>=18'}
     cpu: [x64]
     os: [linux]
+
+  '@esbuild/win32-x64@0.28.2':
+    resolution: {integrity: sha512-5ebpxr3nWMzrL/rnUI755Jkuee0bHL/Gq0WTF9lvcpv73wAp5eu8MfBUgWK9bhWvZjj7yX8etf/8tI8Ney695g==}
+    engines: {node: '>=18'}
+    cpu: [x64]
+    os: [win32]
 
   '@floating-ui/core@1.8.0':
     resolution: {integrity: sha512-0CIZ5itps/8x7BG8dEIhs53BvCUH2PCoogtakwRTut+Arm58sJooJ0AuZhLw2HJYIR5cMLNPBSS728sPho2khQ==}
@@ -1548,6 +1566,11 @@ packages:
     os: [linux]
     libc: [glibc]
 
+  '@rollup/rollup-win32-x64-msvc@4.64.3':
+    resolution: {integrity: sha512-qTv4bG+eKJKifzxNJevMUh8L6CjJrz9/Kn1IbP2F5bo0tBzNIR7HMg4vni6XmDzcKUl00lHHY+J5ZgjbGiujOQ==}
+    cpu: [x64]
+    os: [win32]
+
   '@scalar/helpers@0.16.2':
     resolution: {integrity: sha512-jHSF4KZI/EcVI7WhhgNyw9vvuVCXmwP4rkMXwcaZJjMg1tFPHSOWqIcq123CsUwCMR34SEBAGSJR+Eskrz+7Qg==}
     engines: {node: '>=22'}
@@ -1612,6 +1635,12 @@ packages:
       - '@tybys/wasm-util'
       - '@emnapi/wasi-threads'
       - tslib
+
+  '@tailwindcss/oxide-win32-x64-msvc@4.3.3':
+    resolution: {integrity: sha512-yJ0pwIVc/nYeGoV02WtsN8KYyLQv7kyI2wDnkezyJlGGjkd4QLwDGAwl47YpPJeuI0M0ObaXGSPjvWDPeTPggw==}
+    engines: {node: '>= 20'}
+    cpu: [x64]
+    os: [win32]
 
   '@tailwindcss/oxide@4.3.3':
     resolution: {integrity: sha512-krXjAikiaFSPaK/FkAQT5UTx3VormQaiZ5hBFlJZ9UFQGB/rwg1MZIhHAG9smMQRTdyJxP6Qt5MwMtdyU5FWrA==}
@@ -2369,6 +2398,12 @@ packages:
     cpu: [x64]
     os: [linux]
     libc: [glibc]
+
+  lightningcss-win32-x64-msvc@1.33.0:
+    resolution: {integrity: sha512-OlEICDx/Xl0FqSp4bry8zFnCvGpig3Gl4gCquvYwHuqJKEC1+n9NgDniFvqHGmMv1ZkqDJrDqKKSykTDX+ehuA==}
+    engines: {node: '>= 12.0.0'}
+    cpu: [x64]
+    os: [win32]
 
   lightningcss@1.32.0:
     resolution: {integrity: sha512-NXYBzinNrblfraPGyrbPoD19C1h9lfI/1mzgWYvXUTe414Gz/X1FD2XBZSZM7rRTrMA8JL3OtAaGifrIKhQ5yQ==}
@@ -3208,6 +3243,8 @@ snapshots:
   '@esbuild/linux-x64@0.28.2':
     optional: true
 
+  '@esbuild/win32-x64@0.28.2': {}
+
   '@floating-ui/core@1.8.0':
     dependencies:
       '@floating-ui/utils': 0.2.12
@@ -3329,7 +3366,7 @@ snapshots:
     transitivePeerDependencies:
       - '@faker-js/faker'
 
-  '@orval/query@8.40.0(@tanstack/react-query@5.104.1)':
+  '@orval/query@8.40.0(@tanstack/react-query@5.104.1(react@19.1.0))':
     dependencies:
       '@orval/core': 8.40.0
       '@orval/fetch': 8.40.0
@@ -4055,6 +4092,8 @@ snapshots:
   '@rollup/rollup-linux-x64-gnu@4.64.2':
     optional: true
 
+  '@rollup/rollup-win32-x64-msvc@4.64.3': {}
+
   '@scalar/helpers@0.16.2': {}
 
   '@scalar/json-magic@0.15.6':
@@ -4125,6 +4164,8 @@ snapshots:
 
   '@tailwindcss/oxide-wasm32-wasi@4.3.3':
     optional: true
+
+  '@tailwindcss/oxide-win32-x64-msvc@4.3.3': {}
 
   '@tailwindcss/oxide@4.3.3':
     optionalDependencies:
@@ -4775,6 +4816,8 @@ snapshots:
   lightningcss-linux-x64-gnu@1.32.0:
     optional: true
 
+  lightningcss-win32-x64-msvc@1.33.0: {}
+
   lightningcss@1.32.0:
     dependencies:
       detect-libc: 2.1.2
@@ -4864,7 +4907,7 @@ snapshots:
     dependencies:
       wrappy: 1.0.2
 
-  orval@8.40.0(@tanstack/react-query@5.104.1)(prettier@3.9.9)(typescript@5.9.3)(zod@4.6.5):
+  orval@8.40.0(@tanstack/react-query@5.104.1(react@19.1.0))(prettier@3.9.9)(typescript@5.9.3)(zod@4.6.5):
     dependencies:
       '@commander-js/extra-typings': 15.0.0(commander@15.0.0)
       '@orval/angular': 8.40.0
@@ -4876,7 +4919,7 @@ snapshots:
       '@orval/mcp': 8.40.0(zod@4.6.5)
       '@orval/mock': 8.40.0
       '@orval/pinia-colada': 8.40.0
-      '@orval/query': 8.40.0(@tanstack/react-query@5.104.1)
+      '@orval/query': 8.40.0(@tanstack/react-query@5.104.1(react@19.1.0))
       '@orval/solid-start': 8.40.0
       '@orval/swr': 8.40.0
       '@orval/zod': 8.40.0(zod@4.6.5)
