@@ -4,7 +4,7 @@ import { ErrorBoundary } from '@/components/error-boundary';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { Link, Route, Switch, useLocation, Router as WouterRouter } from 'wouter';
-import { LayoutDashboard, Truck, Building2, UsersRound, BookOpen, Tags, Boxes, Search, Plus, Pencil, Trash2, ArrowUpRight, ArrowRight, Menu, X, Bell, TriangleAlert, PackageCheck, Library, Check, Minus, Save, CalendarDays } from 'lucide-react';
+import { LayoutDashboard, Truck, Building2, UsersRound, BookOpen, Tags, Boxes, Search, Plus, Pencil, Trash2, ArrowUpRight, ArrowRight, Menu, X, Bell, TriangleAlert, PackageCheck, Library, Check, Minus, Save, CalendarDays, PlusCircle, Users2, FileOutput, FileText, ArrowDownLeft, RotateCcw, ClipboardList, FilePen, ShoppingBag, Package, Smartphone, Wallet, ChevronDown, FileInput, ArrowUpLeft, RotateCw, ClipboardCheck, RefreshCcw } from 'lucide-react';
 import NotFound from '@/pages/not-found';
 
 type Customer = { id:string; name:string; email:string; phone:string; school:string; className:string; status:'Active'|'Pending'|'Inactive'; allowedPublications:string[]; allowedBooks?:string[]; joinedAt:string; amountPaid?:number; amountDue?:number };
@@ -14,7 +14,9 @@ type Purchase = { id:string; manufacturer:string; bookId:string; qtyPurchased:nu
 type Dataset = { customers:Customer[]; books:Book[]; offers:Offer[]; purchases:Purchase[] };
 type FormState = { kind:'customer'|'book'|'offer'|'stock'|'purchase'|'bill'; item?:Customer|Book|Offer|Purchase; book?:Book } | null;
 
-const pubs=['RD Sharma','R.S. Aggarwal','NCERT','Arihant Publications','S. Chand'];
+const DEFAULT_PUBS=['RD Sharma','R.S. Aggarwal','NCERT','Arihant Publications','S. Chand'];
+const PUBS_KEY='bookbazaar-pubs-v1';
+const readPubs=():string[]=>{try{const v=localStorage.getItem(PUBS_KEY);return v?JSON.parse(v):DEFAULT_PUBS;}catch{return DEFAULT_PUBS;}};
 const today='2025-02-14';
 const seed:Dataset={
   customers:[
@@ -48,27 +50,84 @@ const money=(n:number)=>`₹${Number(n||0).toLocaleString('en-IN')}`;
 const readStore=():Dataset=>{try{const value=localStorage.getItem('bookbazaar-admin-v1');if(!value)return seed;const parsed=JSON.parse(value);return {...seed,...parsed,purchases:parsed.purchases||seed.purchases};}catch{return seed;}};
 const idFor=(prefix:string)=>`${prefix}-${Math.random().toString(36).slice(2,7).toUpperCase()}`;
 
+const SALE_SUB = [
+  {to:'/sale/invoice',    label:'Sale Invoice',         Icon:FileText,      note:''},
+  {to:'/sale/payment-in', label:'Payment-In',            Icon:ArrowDownLeft, note:''},
+  {to:'/sale/return',     label:'Sale Return',           Icon:RotateCcw,     note:'Credit Note'},
+  {to:'/sale/estimate',   label:'Estimate / Quotation',  Icon:ClipboardList, note:''},
+  {to:'/sale/proforma',   label:'Proforma Invoice',      Icon:FilePen,       note:''},
+  {to:'/sale/order',      label:'Sale Order',            Icon:ShoppingBag,   note:''},
+  {to:'/sale/challan',    label:'Delivery Challan',      Icon:Package,       note:''},
+  {to:'/sale/pos',        label:'Mobile POS',            Icon:Smartphone,    note:''},
+];
+const PURCHASE_SUB = [
+  {to:'/purchase/bill',     label:'Purchase Bill',    Icon:FileInput,      note:''},
+  {to:'/purchase/payment-out', label:'Payment Out',   Icon:ArrowUpLeft,    note:''},
+  {to:'/purchase/return',   label:'Purchase Return',  Icon:RotateCw,       note:''},
+  {to:'/purchase/order',    label:'Purchase Order',   Icon:ClipboardCheck, note:''},
+];
+const RETURN_SUB = [
+  {to:'/return/sale',     label:'Sale Return',     Icon:RotateCcw, note:'Credit Note'},
+  {to:'/return/purchase', label:'Purchase Return', Icon:RotateCw,  note:''},
+];
+function ComingSoon({title,sub,Icon}:{title:string;sub:string;Icon:any}){
+  return <main className="page"><div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',minHeight:'55vh',textAlign:'center',gap:14}}><div style={{width:60,height:60,borderRadius:18,background:'#e8f0e6',display:'grid',placeItems:'center',color:'#3d6b4a'}}><Icon size={26}/></div><h1 style={{fontFamily:'var(--app-font-serif)',fontSize:'clamp(22px,3vw,30px)',color:'#1e3d2c',margin:0}}>{title}</h1><p style={{fontSize:13,color:'#6d7d6e',maxWidth:380,margin:0,lineHeight:1.6}}>{sub}</p><span style={{fontSize:11,color:'#9aaa99',background:'#f0ede4',padding:'6px 14px',borderRadius:20,fontWeight:600}}>Coming soon</span></div></main>;
+}
 function AppShell({children}:{children:ReactNode}) {
-  const [location]=useLocation(); const [menu,setMenu]=useState(false);
-  const nav=[{to:'/',label:'Overview',Icon:LayoutDashboard},{to:'/customers',label:'Customers',Icon:UsersRound},{to:'/books',label:'Books',Icon:BookOpen},{to:'/offers',label:'Offers',Icon:Tags},{to:'/inventory',label:'Inventory',Icon:Boxes}, {to:'/purchases',label:'Purchases',Icon:Truck}];
+  const [location]=useLocation(); const [menu,setMenu]=useState(false); const [saleOpen,setSaleOpen]=useState(()=>location.startsWith('/sale'));
+  const [purchaseOpen,setPurchaseOpen]=useState(()=>location.startsWith('/purchase'));
+  const [returnOpen,setReturnOpen]=useState(()=>location.startsWith('/return'));
+  const isSaleActive=location.startsWith('/sale');
+  const isPurchaseActive=location.startsWith('/purchase');
+  const isReturnActive=location.startsWith('/return');
+  const allPages:Record<string,string>={'/':'Overview','/customers':'Customers','/books':'Books','/offers':'Offers','/inventory':'Inventory','/purchases':'Purchases','/parties':'Parties','/expense':'Expense',...Object.fromEntries(SALE_SUB.map(s=>[s.to,s.label])),...Object.fromEntries(PURCHASE_SUB.map(s=>[s.to,s.label])),...Object.fromEntries(RETURN_SUB.map(s=>[s.to,s.label]))};
+  const mainNav=[{to:'/',label:'Overview',Icon:LayoutDashboard},{to:'/customers',label:'Customers',Icon:UsersRound},{to:'/parties',label:'Parties',Icon:Users2},{to:'/books',label:'Books',Icon:BookOpen},{to:'/offers',label:'Offers',Icon:Tags},{to:'/inventory',label:'Inventory',Icon:Boxes}];
+  const mobileNav=[...mainNav,{to:'/sale/invoice',label:'Sale',Icon:FileOutput},{to:'/expense',label:'Expense',Icon:Wallet}];
   return <div className="app-shell">
     {menu&&<div className="mobile-scrim" onClick={()=>setMenu(false)} />}
     <aside className={`sidebar ${menu?'open':''}`}>
       <div className="brand"><div className="brand-mark">b</div><div><div className="brand-title">book bazaar</div><span className="brand-sub">STAFF WORKSPACE</span></div></div>
       <div className="nav-label">Workspace</div>
-      {nav.map(({to,label,Icon})=><Link key={to} href={to} className={`nav-link ${location===to?'active':''}`} onClick={()=>setMenu(false)} data-testid={`link-${label.toLowerCase()}`}><Icon/><span>{label}</span></Link>)}
+      {mainNav.map(({to,label,Icon})=><Link key={to} href={to} className={`nav-link ${location===to?'active':''}`} onClick={()=>setMenu(false)} data-testid={`link-${label.toLowerCase()}`}><Icon/><span>{label}</span></Link>)}
+      <div className="nav-group">
+        <button className={`nav-group-btn${isSaleActive?' active':''}`} onClick={()=>setSaleOpen(o=>!o)} aria-expanded={saleOpen}>
+          <FileOutput className="main-icon"/><span>Sale</span><ChevronDown className={`nav-chevron${saleOpen?' open':''}`}/>
+        </button>
+        <div className={`nav-sub${saleOpen?' open':''}`}>
+          {SALE_SUB.map(({to,label,Icon,note})=><Link key={to} href={to} className={`nav-sub-item${location===to?' active':''}`} onClick={()=>setMenu(false)}><Icon/><div className="nav-sub-label">{label}{note&&<div className="nav-sub-note">{note}</div>}</div></Link>)}
+        </div>
+      </div>
+      <div className="nav-group">
+        <button className={`nav-group-btn${isPurchaseActive?' active':''}`} onClick={()=>setPurchaseOpen(o=>!o)} aria-expanded={purchaseOpen}>
+          <Truck className="main-icon"/><span>Purchases</span><ChevronDown className={`nav-chevron${purchaseOpen?' open':''}`}/>
+        </button>
+        <div className={`nav-sub${purchaseOpen?' open':''}`}>
+          {PURCHASE_SUB.map(({to,label,Icon,note})=><Link key={to} href={to} className={`nav-sub-item${location===to?' active':''}`} onClick={()=>setMenu(false)}><Icon/><div className="nav-sub-label">{label}{note&&<div className="nav-sub-note">{note}</div>}</div></Link>)}
+        </div>
+      </div>
+      <div className="nav-group">
+        <button className={`nav-group-btn${isReturnActive?' active':''}`} onClick={()=>setReturnOpen(o=>!o)} aria-expanded={returnOpen}>
+          <RefreshCcw className="main-icon"/><span>Return</span><ChevronDown className={`nav-chevron${returnOpen?' open':''}`}/>
+        </button>
+        <div className={`nav-sub${returnOpen?' open':''}`}>
+          {RETURN_SUB.map(({to,label,Icon,note})=><Link key={to} href={to} className={`nav-sub-item${location===to?' active':''}`} onClick={()=>setMenu(false)}><Icon/><div className="nav-sub-label">{label}{note&&<div className="nav-sub-note">{note}</div>}</div></Link>)}
+        </div>
+      </div>
+      <Link href="/expense" className={`nav-link${location==='/expense'?' active':''}`} onClick={()=>setMenu(false)} data-testid="link-expense"><Wallet/><span>Expense</span></Link>
       <div className="sidebar-bottom">The school bookshop<br/>Every title, in good hands.</div>
     </aside>
     <div className="workspace">
-      <header className="topbar"><div className="top-left"><button className="menu-button" onClick={()=>setMenu(!menu)} aria-label="Toggle menu" data-testid="button-menu">{menu?<X/>:<Menu/>}</button><span className="crumb">Book Bazaar&nbsp; / &nbsp;<b>{nav.find(n=>n.to===location)?.label||'Workspace'}</b></span></div><div className="top-actions"><span className="today">Friday, 14 February</span><Bell size={16}/><div className="avatar">S</div><span>Store team</span></div></header>
+      <header className="topbar"><div className="top-left"><button className="menu-button" onClick={()=>setMenu(!menu)} aria-label="Toggle menu" data-testid="button-menu">{menu?<X/>:<Menu/>}</button><span className="crumb">Book Bazaar&nbsp;/&nbsp;<b>{allPages[location]||'Workspace'}</b></span></div><div className="top-actions"><span className="today">Friday, 14 February</span><Bell size={16}/><div className="avatar">S</div><span>Store team</span></div></header>
       {children}
     </div>
-    <nav className="mobile-nav"><div className="mobile-nav-inner">{nav.map(({to,label,Icon})=><Link key={to} href={to} className={location===to?'active':''}><Icon/><span>{label}</span></Link>)}</div></nav>
+    <nav className="mobile-nav"><div className="mobile-nav-inner">{mobileNav.slice(0,6).map(({to,label,Icon})=><Link key={to} href={to} className={(location===to||(to==='/sale/invoice'&&isSaleActive))?'active':''}><Icon/><span>{label}</span></Link>)}</div></nav>
   </div>;
 }
 
 function AppContent(){
   const [data,setData]=useState<Dataset>(readStore); const [form,setForm]=useState<FormState>(null); const [toast,setToast]=useState(''); const [confirm,setConfirm]=useState<{kind:'customer'|'book'|'offer'|'purchase';id:string;name:string}|null>(null);
+  const [pubs,setPubs]=useState<string[]>(readPubs);
+  const addPub=(name:string)=>{const trimmed=name.trim();if(!trimmed||pubs.includes(trimmed))return;const next=[...pubs,trimmed];setPubs(next);localStorage.setItem(PUBS_KEY,JSON.stringify(next));};
   useEffect(()=>{localStorage.setItem('bookbazaar-admin-v1',JSON.stringify(data));},[data]);
   useEffect(()=>{if(!toast)return undefined;const timer=setTimeout(()=>setToast(''),2800);return()=>clearTimeout(timer);},[toast]);
   const save=(kind:'customer'|'book'|'offer'|'stock'|'purchase',values:Record<string,any>,original?:Customer|Book|Offer)=>{
@@ -82,25 +141,42 @@ function AppContent(){
   const endOffer=(id:string)=>{setData(d=>({...d,offers:d.offers.map(o=>o.id===id?{...o,status:'Ended'}:o)}));setToast('Offer ended');};
   const remove=()=>{if(!confirm)return;const {kind,id}=confirm;setData(d=>({...d,[kind==='customer'?'customers':kind==='book'?'books':kind==='offer'?'offers':'purchases']:d[kind==='customer'?'customers':kind==='book'?'books':kind==='offer'?'offers':'purchases'].filter((x:any)=>x.id!==id)}));setToast(`${kind==='customer'?'Customer':kind==='book'?'Book':kind==='offer'?'Offer':'Purchase'} removed`);setConfirm(null);};
   const edit=(kind:'customer'|'book'|'offer'|'purchase',item?:Customer|Book|Offer|Purchase)=>setForm({kind,item});
-  const context={data,setForm,edit,setConfirm,setToast,endOffer};
+  const context={data,setForm,edit,setConfirm,setToast,endOffer,pubs};
   return <AppShell>
     <Switch>
       <Route path="/"><Dashboard {...context}/></Route>
       <Route path="/customers"><Customers {...context}/></Route>
+      <Route path="/parties"><ComingSoon title="Parties" sub="Manage your buyers and suppliers in one place." Icon={Users2}/></Route>
       <Route path="/books"><Books {...context}/></Route>
       <Route path="/offers"><Offers {...context}/></Route>
       <Route path="/inventory"><Inventory {...context}/></Route>
       <Route path="/purchases"><Purchases {...context}/></Route>
+      <Route path="/sale/invoice"><ComingSoon title="Sale Invoice" sub="Create and manage sale invoices." Icon={FileText}/></Route>
+      <Route path="/sale/payment-in"><ComingSoon title="Payment-In" sub="Record incoming payments from customers." Icon={ArrowDownLeft}/></Route>
+      <Route path="/sale/return"><ComingSoon title="Sale Return" sub="Process credit notes and book returns." Icon={RotateCcw}/></Route>
+      <Route path="/sale/estimate"><ComingSoon title="Estimate / Quotation" sub="Send estimates and quotations to customers." Icon={ClipboardList}/></Route>
+      <Route path="/sale/proforma"><ComingSoon title="Proforma Invoice" sub="Issue proforma invoices before final billing." Icon={FilePen}/></Route>
+      <Route path="/sale/order"><ComingSoon title="Sale Order" sub="Track and manage customer orders." Icon={ShoppingBag}/></Route>
+      <Route path="/sale/challan"><ComingSoon title="Delivery Challan" sub="Generate delivery challans for dispatches." Icon={Package}/></Route>
+      <Route path="/sale/pos"><ComingSoon title="Mobile POS" sub="Quick point-of-sale billing on the go." Icon={Smartphone}/></Route>
+      <Route path="/purchases"><Purchases {...context}/></Route>
+      <Route path="/purchase/bill"><ComingSoon title="Purchase Bill" sub="Create and record bills from your suppliers." Icon={FileInput}/></Route>
+      <Route path="/purchase/payment-out"><ComingSoon title="Payment Out" sub="Record outgoing payments to suppliers." Icon={ArrowUpLeft}/></Route>
+      <Route path="/purchase/return"><ComingSoon title="Purchase Return" sub="Process returns to your suppliers." Icon={RotateCw}/></Route>
+      <Route path="/purchase/order"><ComingSoon title="Purchase Order" sub="Manage and track purchase orders." Icon={ClipboardCheck}/></Route>
+      <Route path="/return/sale"><ComingSoon title="Sale Return" sub="Process customer returns and credit notes." Icon={RotateCcw}/></Route>
+      <Route path="/return/purchase"><ComingSoon title="Purchase Return" sub="Send returns back to your suppliers." Icon={RotateCw}/></Route>
+      <Route path="/expense"><ComingSoon title="Expense" sub="Track and categorise your business expenses." Icon={Wallet}/></Route>
       <Route component={NotFound}/>
     </Switch>
-    {form&&form.kind!=='bill'&&<Editor form={form} data={data} onClose={()=>setForm(null)} onSave={save}/>}
+    {form&&form.kind!=='bill'&&<Editor form={form} data={data} pubs={pubs} onAddPub={addPub} onClose={()=>setForm(null)} onSave={save}/>}
     {form&&form.kind==='bill'&&<BillingModal data={data} onClose={()=>setForm(null)}/>}
     {confirm&&<div className="modal-backdrop" role="presentation"><div className="modal" role="dialog" aria-modal="true"><div className="modal-head"><div><h2>Remove this {confirm.kind}?</h2><p>This action cannot be undone.</p></div><button className="icon-button" onClick={()=>setConfirm(null)} aria-label="Close"><X/></button></div><div className="modal-body"><p style={{fontSize:13,color:'#536157',lineHeight:1.6}}>You’re about to remove <b>{confirm.name}</b>. It will no longer appear in your workspace.</p></div><div className="modal-foot"><button className="btn" onClick={()=>setConfirm(null)}>Keep it</button><button className="btn danger" onClick={remove}><Trash2/> Remove</button></div></div></div>}
     {toast&&<div className="toast" role="status" data-testid="status-feedback"><Check size={15} style={{verticalAlign:'middle',marginRight:8}}/>{toast}</div>}
   </AppShell>;
 }
 
-type Context={data:Dataset;setForm:(form:FormState)=>void;edit:(kind:'customer'|'book'|'offer'|'purchase',item?:Customer|Book|Offer|Purchase)=>void;setConfirm:(item:{kind:'customer'|'book'|'offer'|'purchase';id:string;name:string}|null)=>void;setToast:(msg:string)=>void;endOffer:(id:string)=>void};
+type Context={data:Dataset;pubs:string[];setForm:(form:FormState)=>void;edit:(kind:'customer'|'book'|'offer'|'purchase',item?:Customer|Book|Offer|Purchase)=>void;setConfirm:(item:{kind:'customer'|'book'|'offer'|'purchase';id:string;name:string}|null)=>void;setToast:(msg:string)=>void;endOffer:(id:string)=>void};
 function Heading({eyebrow,title,subtitle,children}:{eyebrow:string;title:string;subtitle:string;children?:ReactNode}){return <div className="page-heading"><div><div className="eyebrow">{eyebrow}</div><h1>{title}</h1><p className="subhead">{subtitle}</p></div>{children&&<div className="heading-actions">{children}</div>}</div>}
 function Stat({label,value,note,Icon,tint='green'}:{label:string;value:string|number;note:string;Icon:any;tint?:string}){return <div className="panel stat-card"><div className="stat-top"><span>{label}</span><span className={`stat-icon ${tint}`}><Icon/></span></div><div className="stat-value">{value}</div><div className="stat-note">{note}</div></div>}
 function Pill({children,state}:{children:ReactNode;state?:string}){const cls=state==='Pending'||state==='Draft'||state==='Scheduled'?'warn':state==='Inactive'||state==='Ended'||state==='Out of stock'?'neutral':state==='Low stock'?'red':'';return <span className={`pill ${cls}`}>{children}</span>}
@@ -132,7 +208,7 @@ function Books(c:Context){
  const classes=Array.from(new Set(c.data.books.map(b=>b.className))).sort((a,b)=>Number(a.replace('Class ',''))-Number(b.replace('Class ','')));
  const rows=useMemo(()=>c.data.books.filter(b=>`${b.title} ${b.author} ${b.isbn} ${b.sku}`.toLowerCase().includes(query.toLowerCase())&&(pub==='All publications'||b.publication===pub)&&(cls==='All classes'||b.className===cls)),[c.data.books,query,pub,cls]);
  return <main className="page"><Heading eyebrow="Catalog" title="Books & titles" subtitle="Keep your school catalog accurate, discoverable, and ready to sell."><button className="btn primary" onClick={()=>c.setForm({kind:'book'})} data-testid="button-add-book"><Plus/> Add a book</button></Heading>
- <div className="toolbar"><SearchBar value={query} onChange={setQuery} placeholder="Search titles, authors, ISBN or SKU…"/><select className="filter-select" value={pub} onChange={e=>setPub(e.target.value)} aria-label="Filter publication"><option>All publications</option>{pubs.map(p=><option key={p}>{p}</option>)}</select><select className="filter-select" value={cls} onChange={e=>setCls(e.target.value)} aria-label="Filter class"><option>All classes</option>{classes.map(x=><option key={x}>{x}</option>)}</select><span className="muted" style={{marginLeft:'auto'}}>{rows.length} titles</span></div>
+ <div className="toolbar"><SearchBar value={query} onChange={setQuery} placeholder="Search titles, authors, ISBN or SKU…"/><select className="filter-select" value={pub} onChange={e=>setPub(e.target.value)} aria-label="Filter publication"><option>All publications</option>{c.pubs.map(p=><option key={p}>{p}</option>)}</select><select className="filter-select" value={cls} onChange={e=>setCls(e.target.value)} aria-label="Filter class"><option>All classes</option>{classes.map(x=><option key={x}>{x}</option>)}</select><span className="muted" style={{marginLeft:'auto'}}>{rows.length} titles</span></div>
  <section className="panel"><div className="table-wrap"><table className="data-table"><thead><tr><th>Book title</th><th>Publication</th><th>Class / subject</th><th>SKU / ISBN</th><th>Price</th><th>Stock</th><th>Status</th><th></th></tr></thead><tbody>{rows.map(b=><tr key={b.id} data-testid={`row-book-${b.id}`} className={b.stock<=b.lowStockThreshold?'low-row':''}><td><div className="book-title">{b.title}</div><div className="muted">{b.author}</div></td><td>{b.publication}</td><td>{b.className}<div className="muted">{b.subject}</div></td><td><span style={{fontSize:10}}>{b.sku}</span><div className="muted">{b.isbn}</div></td><td>{money(b.price)}</td><td><b style={{color:b.stock===0?'#a24840':b.stock<=b.lowStockThreshold?'#a9663b':'#465d49'}}>{b.stock}</b><div className="muted">min. {b.lowStockThreshold}</div></td><td><Pill state={b.status}>{b.status}</Pill></td><td><div className="row-actions"><button className="icon-button" title="Edit book" aria-label={`Edit ${b.title}`} onClick={()=>c.edit('book',b)}><Pencil/></button><button className="icon-button" title="Remove book" aria-label={`Remove ${b.title}`} onClick={()=>c.setConfirm({kind:'book',id:b.id,name:b.title})}><Trash2/></button></div></td></tr>)}</tbody></table>{!rows.length&&<TableEmpty label="No titles found" detail="Try changing your search or publication filters." Icon={BookOpen} action={<button className="btn primary" onClick={()=>c.setForm({kind:'book'})}><Plus/> Add a book</button>}/>}</div></section></main>
 }
 
@@ -169,11 +245,11 @@ function Inventory(c:Context){
  <section className="panel"><div className="table-wrap"><table className="data-table"><thead><tr><th>Title</th><th>Publication</th><th>SKU</th><th>On hand</th><th>Reorder point</th><th>Stock health</th><th>Stock value</th><th></th></tr></thead><tbody>{rows.map(b=><tr key={b.id} className={b.stock<=b.lowStockThreshold?'low-row':''}><td><div className="book-title">{b.title}</div><div className="muted">{b.author}</div></td><td>{b.publication}</td><td>{b.sku}</td><td><b style={{fontSize:14,color:b.stock===0?'#a24840':b.stock<=b.lowStockThreshold?'#a9663b':'#31513d'}}>{b.stock}</b></td><td>{b.lowStockThreshold} units</td><td><Pill state={b.stock===0?'Out of stock':b.stock<=b.lowStockThreshold?'Low stock':'Healthy'}>{b.stock===0?'Out of stock':b.stock<=b.lowStockThreshold?'Low stock':'Healthy'}</Pill></td><td>{money(b.stock*b.price)}</td><td><button className="btn" style={{padding:'7px 10px'}} onClick={()=>c.setForm({kind:'stock',book:b})}><Plus size={13}/> Adjust</button></td></tr>)}</tbody></table>{!rows.length&&<TableEmpty label="Nothing in this view" detail="Try another filter or search term." Icon={Boxes}/>}</div></section></main>
 }
 
-function Editor({form,data,onClose,onSave}:{form:Exclude<FormState,null>;data:Dataset;onClose:()=>void;onSave:(kind:any,values:any,original?:any)=>void}){
+function Editor({form,data,pubs,onAddPub,onClose,onSave}:{form:Exclude<FormState,null>;data:Dataset;pubs:string[];onAddPub:(name:string)=>void;onClose:()=>void;onSave:(kind:any,values:any,original?:any)=>void}){
  const kind=form.kind; const editing=!!form.item; const original=form.item as any;
  const [values,setValues]=useState<Record<string,any>>(()=>{
    if(kind==='customer')return original?{...original,allowedPublications:[...original.allowedPublications],allowedBooks:original.allowedBooks?[...original.allowedBooks]:[]}:{name:'',email:'',phone:'',school:'',className:'Class 5',status:'Active',allowedPublications:[],allowedBooks:[]};
-   if(kind==='book')return original?{...original}:{title:'',author:'',publication:'RD Sharma',subject:'Mathematics',className:'Class 5',isbn:'',sku:'',price:'',stock:0,lowStockThreshold:10,status:'Active'};
+   if(kind==='book')return original?{...original}:{title:'',publication:pubs[0]||'RD Sharma',subject:'Mathematics',className:'Class 5',isbn:'',sku:'',price:'',stock:0,lowStockThreshold:10,status:'Active'};
    if(kind==='offer')return original?{...original,bookIds:[...original.bookIds]}:{title:'',bookIds:[],discountPercent:10,startDate:today,endDate:'2025-03-15',status:'Active'};
     if(kind==='purchase')return original?{...original}:{manufacturer:'',bookId:'',qtyPurchased:100,amountPaid:0,amountDue:0,status:'Pending',date:today};
    return {delta:0,book:form.book};
@@ -181,13 +257,15 @@ function Editor({form,data,onClose,onSave}:{form:Exclude<FormState,null>;data:Da
  const [selClass, setSelClass] = useState('');
  const [selPub, setSelPub] = useState('');
  const [selBook, setSelBook] = useState('');
+ const [newPubInput, setNewPubInput] = useState('');
+ const [showPubInput, setShowPubInput] = useState(false);
  const set=(key:string,value:any)=>setValues(v=>({...v,[key]:value}));
  const submit=(e:FormEvent)=>{e.preventDefault();const payload={...values};if(kind==='book'){payload.price=Number(payload.price);payload.stock=Number(payload.stock);payload.lowStockThreshold=Number(payload.lowStockThreshold);}if(kind==='offer')payload.discountPercent=Number(payload.discountPercent);if(kind==='purchase'){payload.qtyPurchased=Number(payload.qtyPurchased);payload.amountPaid=Number(payload.amountPaid);payload.amountDue=Number(payload.amountDue);}onSave(kind,payload,original);};
  const title=kind==='customer'?(editing?'Edit customer account':'Create customer account'):kind==='book'?(editing?'Edit book details':'Add a book to catalog'):kind==='offer'?(editing?'Edit offer':'Create an offer'):kind==='purchase'?(editing?'Edit purchase':'Record purchase'):'Adjust stock';
  const desc=kind==='customer'?'Account details and publication permissions':kind==='book'?'Catalog information, pricing, and stock threshold':kind==='offer'?'Choose the books and dates for this offer':kind==='purchase'?'Log a wholesaler purchase and payment status':'Record a stock movement';
  return <div className="modal-backdrop" onMouseDown={e=>{if(e.target===e.currentTarget)onClose()}}><form className="modal" onSubmit={submit} role="dialog" aria-modal="true"><div className="modal-head"><div><h2>{title}</h2><p>{desc}</p></div><button type="button" className="icon-button" onClick={onClose} aria-label="Close"><X/></button></div><div className="modal-body">
   {kind==='customer'&&<div className="form-grid"><div className="field"><label>Full name *</label><input required value={values.name} onChange={e=>set('name',e.target.value)} placeholder="e.g. Aanya Sharma"/></div><div className="field"><label>Email address *</label><input required type="email" value={values.email} onChange={e=>set('email',e.target.value)} placeholder="family@email.com"/></div><div className="field"><label>Phone number *</label><input required value={values.phone} onChange={e=>set('phone',e.target.value)} placeholder="+91 98xxx xxxxx"/></div><div className="field"><label>School *</label><input required value={values.school} onChange={e=>set('school',e.target.value)} placeholder="School name"/></div><div className="field"><label>Amount Paid (₹)</label><input type="number" min="0" value={values.amountPaid ?? ''} onChange={e=>set('amountPaid',e.target.value)}/></div><div className="field"><label>Amount Due (₹)</label><input type="number" min="0" value={values.amountDue ?? ''} onChange={e=>set('amountDue',e.target.value)}/></div><div className="field"><label>Account status</label><select value={values.status} onChange={e=>set('status',e.target.value)}><option>Active</option><option>Pending</option><option>Inactive</option></select></div><div className="field full"><label>Assign specific books</label><div style={{display:'flex',gap:8,marginBottom:8}}><select style={{flex:1}} value={selClass} onChange={e=>{setSelClass(e.target.value);setSelPub('');setSelBook('');}}><option value="">Select Class</option>{Array.from({length:12},(_,i)=>`Class ${i+1}`).map(x=><option key={x}>{x}</option>)}</select><select style={{flex:1}} value={selPub} onChange={e=>{setSelPub(e.target.value);setSelBook('');}} disabled={!selClass}><option value="">Select Publication</option>{Array.from(new Set(data.books.filter(b=>b.className===selClass).map(b=>b.publication))).map(p=><option key={p}>{p}</option>)}</select><select style={{flex:1}} value={selBook} onChange={e=>setSelBook(e.target.value)} disabled={!selPub}><option value="">Select Book</option>{data.books.filter(b=>b.className===selClass&&b.publication===selPub).map(b=><option key={b.id} value={b.id}>{b.title}</option>)}</select><button type="button" className="btn" disabled={!selBook} onClick={()=>{if(!values.allowedBooks?.includes(selBook))set('allowedBooks',[...(values.allowedBooks||[]),selBook]);setSelBook('');}}>Add</button></div><div className="checks">{(values.allowedBooks||[]).map((id:string)=>{const b=data.books.find(x=>x.id===id);return <label className="check-pill" key={id}><input type="checkbox" checked onChange={()=>set('allowedBooks',values.allowedBooks.filter((x:string)=>x!==id))}/>{b?.title||id}</label>})}</div><span className="muted">Families can only purchase these selected titles.</span></div></div>}
-  {kind==='book'&&<div className="form-grid"><div className="field full"><label>Book title *</label><input required value={values.title} onChange={e=>set('title',e.target.value)} placeholder="Title as it appears on the cover"/></div><div className="field"><label>Author *</label><input required value={values.author} onChange={e=>set('author',e.target.value)} placeholder="Author or editorial team"/></div><div className="field"><label>Publication *</label><select value={values.publication} onChange={e=>set('publication',e.target.value)}>{pubs.map(p=><option key={p}>{p}</option>)}</select></div><div className="field"><label>Subject</label><input value={values.subject} onChange={e=>set('subject',e.target.value)} placeholder="Mathematics"/></div><div className="field"><label>Class</label><select value={values.className} onChange={e=>set('className',e.target.value)}>{Array.from({length:12},(_,i)=>`Class ${i+1}`).map(x=><option key={x}>{x}</option>)}</select></div><div className="field"><label>ISBN</label><input value={values.isbn} onChange={e=>set('isbn',e.target.value)} placeholder="978-…"/></div><div className="field"><label>SKU *</label><input required value={values.sku} onChange={e=>set('sku',e.target.value)} placeholder="RDS-MTH-08"/></div><div className="field"><label>Price (₹) *</label><input required type="number" min="0" step="1" value={values.price} onChange={e=>set('price',e.target.value)} placeholder="0"/></div><div className="field"><label>Units in stock</label><input type="number" min="0" value={values.stock} onChange={e=>set('stock',e.target.value)}/></div><div className="field"><label>Low-stock threshold</label><input type="number" min="0" value={values.lowStockThreshold} onChange={e=>set('lowStockThreshold',e.target.value)}/></div><div className="field"><label>Catalog status</label><select value={values.status} onChange={e=>set('status',e.target.value)}><option>Active</option><option>Draft</option><option>Archived</option></select></div></div>}
+  {kind==='book'&&<div className="form-grid"><div className="field full"><label>Book title *</label><input required value={values.title} onChange={e=>set('title',e.target.value)} placeholder="Title as it appears on the cover"/></div><div className="field full"><label>Publication *</label><div style={{display:'flex',gap:8,alignItems:'flex-start'}}><select style={{flex:1}} value={values.publication} onChange={e=>set('publication',e.target.value)}>{pubs.map(p=><option key={p}>{p}</option>)}</select><button type="button" title="Add new publication" style={{flexShrink:0,display:'flex',alignItems:'center',gap:5,padding:'8px 12px',background:'#f0efe6',border:'1px solid #d5cfc3',borderRadius:7,cursor:'pointer',fontSize:12,color:'#3a5241',fontWeight:600,whiteSpace:'nowrap'}} onClick={()=>setShowPubInput(v=>!v)}><PlusCircle size={14}/> Add publication</button></div>{showPubInput&&<div style={{display:'flex',gap:8,marginTop:8,alignItems:'center'}}><input style={{flex:1,fontSize:13,padding:'7px 10px',border:'1px solid #d5cfc3',borderRadius:7,outline:'none'}} placeholder="e.g. Oxford University Press" value={newPubInput} onChange={e=>setNewPubInput(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'){e.preventDefault();if(newPubInput.trim()){onAddPub(newPubInput.trim());set('publication',newPubInput.trim());setNewPubInput('');setShowPubInput(false);}}}}/><button type="button" style={{padding:'7px 14px',background:'#3a5241',color:'#fff',border:'none',borderRadius:7,cursor:'pointer',fontWeight:600,fontSize:12}} onClick={()=>{if(newPubInput.trim()){onAddPub(newPubInput.trim());set('publication',newPubInput.trim());setNewPubInput('');setShowPubInput(false);}}}>Add</button><button type="button" style={{padding:'7px 12px',background:'transparent',border:'1px solid #d5cfc3',borderRadius:7,cursor:'pointer',fontSize:12,color:'#536157'}} onClick={()=>{setShowPubInput(false);setNewPubInput('');}}>Cancel</button></div>}</div><div className="field"><label>Subject</label><input value={values.subject} onChange={e=>set('subject',e.target.value)} placeholder="Mathematics"/></div><div className="field"><label>Class</label><select value={values.className} onChange={e=>set('className',e.target.value)}>{Array.from({length:12},(_,i)=>`Class ${i+1}`).map(x=><option key={x}>{x}</option>)}</select></div><div className="field"><label>ISBN</label><input value={values.isbn} onChange={e=>set('isbn',e.target.value)} placeholder="978-…"/></div><div className="field"><label>SKU *</label><input required value={values.sku} onChange={e=>set('sku',e.target.value)} placeholder="RDS-MTH-08"/></div><div className="field"><label>Price (₹) *</label><input required type="number" min="0" step="1" value={values.price} onChange={e=>set('price',e.target.value)} placeholder="0"/></div><div className="field"><label>Units in stock</label><input type="number" min="0" value={values.stock} onChange={e=>set('stock',e.target.value)}/></div><div className="field"><label>Low-stock threshold</label><input type="number" min="0" value={values.lowStockThreshold} onChange={e=>set('lowStockThreshold',e.target.value)}/></div><div className="field"><label>Catalog status</label><select value={values.status} onChange={e=>set('status',e.target.value)}><option>Active</option><option>Draft</option><option>Archived</option></select></div></div>}
   {kind==='offer'&&<div className="form-grid"><div className="field full"><label>Offer name *</label><input required value={values.title} onChange={e=>set('title',e.target.value)} placeholder="A stronger start in maths"/></div><div className="field"><label>Discount (%) *</label><input required type="number" min="1" max="90" value={values.discountPercent} onChange={e=>set('discountPercent',e.target.value)}/></div><div className="field"><label>Status</label><select value={values.status} onChange={e=>set('status',e.target.value)}><option>Active</option><option>Scheduled</option><option>Ended</option></select></div><div className="field"><label>Start date</label><input required type="date" value={values.startDate} onChange={e=>set('startDate',e.target.value)}/></div><div className="field"><label>End date</label><input required type="date" min={values.startDate} value={values.endDate} onChange={e=>set('endDate',e.target.value)}/></div><div className="field full"><label>Included books</label><div className="checks">{data.books.map(b=><label className="check-pill" key={b.id}><input type="checkbox" checked={values.bookIds.includes(b.id)} onChange={e=>set('bookIds',e.target.checked?[...values.bookIds,b.id]:values.bookIds.filter((x:string)=>x!==b.id))}/>{b.title}</label>)}</div></div></div>}
   {kind==='purchase'&&<div className="form-grid"><div className="field full"><label>Wholesaler Name *</label><input required value={values.manufacturer} onChange={e=>set('manufacturer',e.target.value)} placeholder="e.g. Apex Distributors"/></div><div className="field full"><label>Book</label><select required value={values.bookId} onChange={e=>set('bookId',e.target.value)}><option value="">Select a catalog book</option>{data.books.map(b=><option key={b.id} value={b.id}>{b.title} ({b.className})</option>)}</select></div><div className="field"><label>Qty Purchased</label><input type="number" required value={values.qtyPurchased} onChange={e=>set('qtyPurchased',e.target.value)}/></div><div className="field"><label>Amount Paid (₹)</label><input type="number" required value={values.amountPaid} onChange={e=>set('amountPaid',e.target.value)}/></div><div className="field"><label>Amount Due (₹)</label><input type="number" required value={values.amountDue} onChange={e=>set('amountDue',e.target.value)}/></div><div className="field"><label>Payment Status</label><select value={values.status} onChange={e=>set('status',e.target.value)}><option>Paid</option><option>Partial</option><option>Pending</option></select></div><div className="field"><label>Date</label><input type="date" required value={values.date} onChange={e=>set('date',e.target.value)}/></div></div>}
    {kind==='stock'&&<div><div style={{background:'#f0efe6',borderRadius:9,padding:14,marginBottom:17}}><div className="book-title">{form.book?.title}</div><div className="muted">{form.book?.publication} · {form.book?.sku} · Currently {form.book?.stock} units</div></div><div className="field"><label>Quantity change</label><input type="number" required value={values.delta} onChange={e=>set('delta',e.target.value)} placeholder="Use a negative number to record a sale or correction"/><span className="muted">Current quantity: {form.book?.stock}. New quantity cannot be below zero.</span></div><div style={{display:'flex',gap:8,marginTop:14}}><button className="btn" type="button" onClick={()=>set('delta',Number(values.delta)-1)}><Minus/> Remove one</button><button className="btn" type="button" onClick={()=>set('delta',Number(values.delta)+1)}><Plus/> Add one</button></div></div>}
