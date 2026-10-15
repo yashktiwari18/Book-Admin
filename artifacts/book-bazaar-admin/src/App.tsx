@@ -70,6 +70,195 @@ const RETURN_SUB = [
   {to:'/return/sale',     label:'Sale Return',     Icon:RotateCcw, note:'Credit Note'},
   {to:'/return/purchase', label:'Purchase Return', Icon:RotateCw,  note:''},
 ];
+// ─────────────────────── Sale Invoice Types & Components ─────────────────────
+const INVOICE_KEY='bookbazaar-invoices-v1';
+type InvoiceItem={id:string;bookId:string;name:string;qty:number;price:number;discountPct:number};
+type SaleInvoiceType={id:string;invoiceNo:string;date:string;time:string;customerName:string;billingName:string;phone:string;partyBalance:number;items:InvoiceItem[];discountPct:number;shipping:number;roundOff:boolean;received:number;paymentType:string;paymentRef:string;notes:string;terms:string;status:'Paid'|'Partial'|'Unpaid'};
+function calcInvoiceTotal(inv:SaleInvoiceType){const sub=inv.items.reduce((s,i)=>s+i.qty*i.price*(1-i.discountPct/100),0);const aft=sub*(1-inv.discountPct/100)+inv.shipping;return inv.roundOff?Math.round(aft):aft;}
+function SaleInvoicePage(c:Context){
+  const [invoices,setInvoices]=useState<SaleInvoiceType[]>(()=>{try{const v=localStorage.getItem(INVOICE_KEY);return v?JSON.parse(v):[];}catch{return [];}});
+  const [view,setView]=useState<'list'|'form'>('list');
+  const [editing,setEditing]=useState<SaleInvoiceType|null>(null);
+  useEffect(()=>{localStorage.setItem(INVOICE_KEY,JSON.stringify(invoices));},[invoices]);
+  const nowTime=()=>new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',hour12:true});
+  const nextNo=()=>`BB-${String(invoices.length+1).padStart(4,'0')}`;
+  const openNew=()=>{setEditing(null);setView('form');};
+  const openEdit=(inv:SaleInvoiceType)=>{setEditing(inv);setView('form');};
+  const closeForm=()=>{setView('list');setEditing(null);};
+  const saveInvoice=(inv:SaleInvoiceType)=>{setInvoices(prev=>editing?prev.map(x=>x.id===inv.id?inv:x):[inv,...prev]);closeForm();};
+  const delInvoice=(id:string)=>setInvoices(prev=>prev.filter(x=>x.id!==id));
+  if(view==='form')return <InvoiceForm data={c.data} initial={editing} nextNo={nextNo()} nowTime={nowTime()} onSave={saveInvoice} onClose={closeForm} onDelete={editing?()=>{delInvoice(editing.id);closeForm();}:undefined}/>;
+  return(
+    <main className="page">
+      <Heading eyebrow="Sale" title="Sale Invoices" subtitle="Create and manage sale invoices for your customers."><button className="btn primary" onClick={openNew}><Plus/> New Invoice</button></Heading>
+      <div className="stat-grid">
+        <Stat label="Total Invoices" value={invoices.length} note="All time" Icon={FileText}/>
+        <Stat label="Total Billed" value={money(invoices.reduce((s,inv)=>s+calcInvoiceTotal(inv),0))} note="Gross amount" Icon={FileOutput}/>
+        <Stat label="Collected" value={money(invoices.reduce((s,inv)=>s+inv.received,0))} note="Payments received" Icon={Check}/>
+        <Stat label="Balance Due" value={money(invoices.reduce((s,inv)=>s+Math.max(0,calcInvoiceTotal(inv)-inv.received),0))} note="Outstanding" Icon={TriangleAlert} tint="red"/>
+      </div>
+      <section className="panel">
+        <div className="table-wrap"><table className="data-table">
+          <thead><tr><th>Invoice No.</th><th>Customer</th><th>Date</th><th>Items</th><th>Total</th><th>Received</th><th>Balance</th><th>Status</th><th></th></tr></thead>
+          <tbody>{invoices.map(inv=>{const tot=calcInvoiceTotal(inv);const bal=tot-inv.received;const st=inv.received===0?'Unpaid':bal<=0?'Paid':'Partial';return(
+            <tr key={inv.id}>
+              <td><div className="book-title">{inv.invoiceNo}</div><div className="muted">{inv.time}</div></td>
+              <td><div className="book-title">{inv.customerName||'—'}</div><div className="muted">{inv.phone}</div></td>
+              <td>{inv.date}</td>
+              <td>{inv.items.length} item{inv.items.length!==1?'s':''}</td>
+              <td><b>{money(tot)}</b></td>
+              <td style={{color:'#3a6647'}}>{money(inv.received)}</td>
+              <td style={{color:bal>0?'#a24840':'#3a6647',fontWeight:600}}>{money(Math.max(0,bal))}</td>
+              <td><Pill state={st}>{st}</Pill></td>
+              <td><div className="row-actions"><button className="icon-button" title="Edit" onClick={()=>openEdit(inv)}><Pencil/></button><button className="icon-button" title="Delete" onClick={()=>delInvoice(inv.id)}><Trash2/></button></div></td>
+            </tr>
+          );})}</tbody>
+        </table>
+        {!invoices.length&&<TableEmpty label="No invoices yet" detail="Create your first sale invoice to get started." Icon={FileText} action={<button className="btn primary" onClick={openNew}><Plus/> New Invoice</button>}/>}
+        </div>
+      </section>
+    </main>
+  );
+}
+function InvoiceForm({data,initial,nextNo,nowTime,onSave,onClose,onDelete}:{data:Dataset;initial:SaleInvoiceType|null;nextNo:string;nowTime:string;onSave:(inv:SaleInvoiceType)=>void;onClose:()=>void;onDelete?:()=>void}){
+  const blank:Omit<SaleInvoiceType,'id'>={invoiceNo:nextNo,date:today,time:nowTime,customerName:'',billingName:'',phone:'',partyBalance:0,items:[],discountPct:0,shipping:0,roundOff:false,received:0,paymentType:'Cash',paymentRef:'',notes:'',terms:'1) Thank you for doing business with us.\n2) E. & O.E.\n3) Goods once sold will not be taken back.',status:'Unpaid'};
+  const [f,setF]=useState<Omit<SaleInvoiceType,'id'>>(initial||blank);
+  const set=(k:string,v:any)=>setF(p=>({...p,[k]:v}));
+  const [selBook,setSelBook]=useState('');
+  const [selQty,setSelQty]=useState(1);
+  const [selPrice,setSelPrice]=useState(0);
+  const [selDisc,setSelDisc]=useState(0);
+  const [termsOpen,setTermsOpen]=useState(false);
+  const itemsSub=f.items.reduce((s,i)=>s+i.qty*i.price*(1-i.discountPct/100),0);
+  const afterDisc=itemsSub*(1-f.discountPct/100);
+  const withShip=afterDisc+f.shipping;
+  const total=f.roundOff?Math.round(withShip):withShip;
+  const balDue=total-f.received;
+  const addItem=()=>{
+    const book=data.books.find(b=>b.id===selBook);
+    const name=book?.title||(selBook?selBook:'Custom Item');
+    const price=selPrice||(book?.price||0);
+    if(!name||price<=0)return;
+    set('items',[...f.items,{id:idFor('ITM'),bookId:selBook,name,qty:selQty,price,discountPct:selDisc}]);
+    setSelBook('');setSelQty(1);setSelPrice(0);setSelDisc(0);
+  };
+  const remItem=(id:string)=>set('items',f.items.filter(i=>i.id!==id));
+  const updItem=(id:string,k:string,v:any)=>set('items',f.items.map(i=>i.id===id?{...i,[k]:v}:i));
+  const handleSave=()=>{const st=(f.received===0?'Unpaid':balDue<=0?'Paid':'Partial') as SaleInvoiceType['status'];onSave({...f,id:initial?.id||idFor('INV'),status:st});};
+  return(
+    <main className="page" style={{maxWidth:700}}>
+      <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:24}}>
+        <button className="icon-button" onClick={onClose} style={{border:'1px solid #e2ded2',flexShrink:0}}><ArrowRight style={{transform:'rotate(180deg)'}}/></button>
+        <h1 style={{fontFamily:'var(--app-font-serif)',fontSize:22,margin:0,color:'#1e3d2c',flex:1}}>{initial?'Edit Invoice':'New Sale Invoice'}</h1>
+        {onDelete&&<button className="btn danger" onClick={onDelete}><Trash2/> Delete</button>}
+        <button className="btn primary" onClick={handleSave}><Save/> Save</button>
+      </div>
+      <section className="panel panel-pad" style={{marginBottom:14}}>
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:14}}>
+          <div className="field"><label>Invoice No.</label><input value={f.invoiceNo} onChange={e=>set('invoiceNo',e.target.value)}/></div>
+          <div className="field"><label>Date</label><input type="date" value={f.date} onChange={e=>set('date',e.target.value)}/></div>
+          <div className="field"><label>Time</label><input type="time" value={f.time} onChange={e=>set('time',e.target.value)}/></div>
+        </div>
+      </section>
+      <section className="panel panel-pad" style={{marginBottom:14}}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}>
+          <h2 style={{fontFamily:'var(--app-font-serif)',fontSize:16,margin:0,color:'#264333'}}>Customer Details</h2>
+          {f.partyBalance>0&&<span style={{fontSize:12,color:'#3a6647',fontWeight:600}}>Party Balance: {money(f.partyBalance)}</span>}
+        </div>
+        <div className="field" style={{marginBottom:10}}><label>Customer Name *</label><input required value={f.customerName} onChange={e=>{set('customerName',e.target.value);if(!f.billingName||f.billingName===f.customerName)set('billingName',e.target.value);}} placeholder="Customer name"/></div>
+        <div className="field" style={{marginBottom:10}}><label>Billing Name (Optional)</label><input value={f.billingName} onChange={e=>set('billingName',e.target.value)} placeholder="Same as customer name"/></div>
+        <div className="field"><label>Phone Number</label><input value={f.phone} onChange={e=>set('phone',e.target.value)} placeholder="+91 00000 00000"/></div>
+      </section>
+      <section className="panel" style={{marginBottom:14}}>
+        <div style={{background:'#4a90d9',borderRadius:'12px 12px 0 0',padding:'12px 18px',display:'flex',alignItems:'center',gap:8,color:'#fff',fontWeight:600,fontSize:13}}><BookOpen size={15}/> Billed Items ({f.items.length})</div>
+        <div className="panel-pad">
+          {f.items.map((item,i)=>(
+            <div key={item.id} style={{border:'1px solid #e7e1d4',borderRadius:9,padding:13,marginBottom:10,background:'#fafaf7'}}>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:6}}>
+                <span style={{fontSize:11,color:'#91a796',fontWeight:700}}>#{i+1}</span>
+                <b style={{fontSize:13,color:'#1e3d2c',flex:1,marginLeft:8}}>{item.name}</b>
+                <span style={{fontSize:13,fontWeight:700,color:'#1e3d2c'}}>{money(item.qty*item.price*(1-item.discountPct/100))}</span>
+              </div>
+              <div style={{fontSize:11,color:'#7d877d',marginBottom:4}}>Item Subtotal: {item.qty} × {money(item.price)} = {money(item.qty*item.price)}</div>
+              {item.discountPct>0&&<div style={{fontSize:11,color:'#a9663b',marginBottom:8}}>Discount ({item.discountPct}%): −{money(item.qty*item.price*item.discountPct/100)}</div>}
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr auto',gap:8,alignItems:'flex-end',marginTop:8}}>
+                <div className="field" style={{marginBottom:0,gap:3}}><label style={{fontSize:9}}>QTY</label><input type="number" min="1" value={item.qty} style={{height:32}} onChange={e=>updItem(item.id,'qty',Number(e.target.value))}/></div>
+                <div className="field" style={{marginBottom:0,gap:3}}><label style={{fontSize:9}}>PRICE (₹)</label><input type="number" min="0" value={item.price} style={{height:32}} onChange={e=>updItem(item.id,'price',Number(e.target.value))}/></div>
+                <div className="field" style={{marginBottom:0,gap:3}}><label style={{fontSize:9}}>DISC %</label><input type="number" min="0" max="100" value={item.discountPct} style={{height:32}} onChange={e=>updItem(item.id,'discountPct',Number(e.target.value))}/></div>
+                <button className="icon-button" style={{border:'1px solid #e4ddd2',marginBottom:1}} onClick={()=>remItem(item.id)}><Trash2/></button>
+              </div>
+            </div>
+          ))}
+          <div style={{border:'1.5px dashed #c5c0b4',borderRadius:9,padding:14,background:'#f9f8f3'}}>
+            <div style={{fontSize:10,fontWeight:700,color:'#8a9389',letterSpacing:'0.8px',marginBottom:10}}>ADD ITEM</div>
+            <div style={{display:'grid',gridTemplateColumns:'2fr 0.7fr 1fr 0.7fr auto',gap:8,alignItems:'flex-end'}}>
+              <div className="field" style={{marginBottom:0,gap:3}}><label style={{fontSize:9}}>BOOK</label><select value={selBook} onChange={e=>{setSelBook(e.target.value);const b=data.books.find(b=>b.id===e.target.value);if(b)setSelPrice(b.price);}} style={{height:34}}><option value="">Select book…</option>{data.books.map(b=><option key={b.id} value={b.id}>{b.title}</option>)}</select></div>
+              <div className="field" style={{marginBottom:0,gap:3}}><label style={{fontSize:9}}>QTY</label><input type="number" min="1" value={selQty} style={{height:34}} onChange={e=>setSelQty(Number(e.target.value))}/></div>
+              <div className="field" style={{marginBottom:0,gap:3}}><label style={{fontSize:9}}>PRICE (₹)</label><input type="number" min="0" value={selPrice} style={{height:34}} onChange={e=>setSelPrice(Number(e.target.value))}/></div>
+              <div className="field" style={{marginBottom:0,gap:3}}><label style={{fontSize:9}}>DISC %</label><input type="number" min="0" max="100" value={selDisc} style={{height:34}} onChange={e=>setSelDisc(Number(e.target.value))}/></div>
+              <button className="btn primary" style={{height:34,padding:'0 12px'}} onClick={addItem}><Plus size={13}/></button>
+            </div>
+          </div>
+        </div>
+      </section>
+      <section className="panel panel-pad" style={{marginBottom:14}}>
+        <h2 style={{fontFamily:'var(--app-font-serif)',fontSize:16,margin:'0 0 14px',color:'#264333'}}>Discount & Charges</h2>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'10px 0',borderBottom:'1px solid #eee9df'}}><span style={{fontSize:13,color:'#536157'}}>Item Subtotal</span><span style={{fontSize:13,color:'#536157'}}>{money(itemsSub)}</span></div>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'10px 0',borderBottom:'1px solid #eee9df'}}>
+          <span style={{fontSize:13,color:'#536157'}}>Discount</span>
+          <div style={{display:'flex',gap:8,alignItems:'center'}}>
+            <input type="number" min="0" max="100" value={f.discountPct} onChange={e=>set('discountPct',Number(e.target.value))} style={{width:65,height:32,border:'1px solid #e2ded2',borderRadius:7,padding:'0 8px',fontSize:13}}/>
+            <span style={{fontSize:11,color:'#9aa093'}}>%</span>
+            <span style={{fontSize:13,color:'#a9663b',minWidth:80,textAlign:'right'}}>−{money(itemsSub*f.discountPct/100)}</span>
+          </div>
+        </div>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'10px 0',borderBottom:'1px solid #eee9df'}}>
+          <span style={{fontSize:13,color:'#536157'}}>Shipping (₹)</span>
+          <input type="number" min="0" value={f.shipping} onChange={e=>set('shipping',Number(e.target.value))} style={{width:110,height:32,border:'1px solid #e2ded2',borderRadius:7,padding:'0 8px',fontSize:13}}/>
+        </div>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'10px 0',borderBottom:'1px solid #eee9df'}}>
+          <label style={{display:'flex',alignItems:'center',gap:8,fontSize:13,color:'#536157',cursor:'pointer'}}><input type="checkbox" checked={f.roundOff} onChange={e=>set('roundOff',e.target.checked)} style={{accentColor:'#315a41'}}/>Round Off</label>
+          <span style={{fontSize:13,color:'#7d877d'}}>{f.roundOff?`₹ ${(Math.round(withShip)-withShip).toFixed(2)}`:'—'}</span>
+        </div>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'14px 0',borderBottom:'1px solid #eee9df'}}>
+          <span style={{fontSize:15,fontWeight:700,color:'#1e3d2c'}}>Total Amount</span>
+          <span style={{fontSize:19,fontWeight:700,color:'#1e3d2c'}}>{money(total)}</span>
+        </div>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'10px 0',borderBottom:'1px solid #eee9df'}}>
+          <label style={{display:'flex',alignItems:'center',gap:8,fontSize:13,color:'#536157',cursor:'pointer'}}><input type="checkbox" checked={f.received>0} onChange={e=>set('received',e.target.checked?total:0)} style={{accentColor:'#315a41'}}/>Received</label>
+          <input type="number" min="0" value={f.received} onChange={e=>set('received',Number(e.target.value))} style={{width:130,height:32,border:'1px solid #e2ded2',borderRadius:7,padding:'0 8px',fontSize:13}}/>
+        </div>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'12px 0'}}>
+          <span style={{fontSize:15,fontWeight:700,color:balDue>0?'#a24840':'#3a6647'}}>Balance Due</span>
+          <span style={{fontSize:18,fontWeight:700,color:balDue>0?'#a24840':'#3a6647'}}>{money(Math.max(0,balDue))}</span>
+        </div>
+      </section>
+      <section className="panel panel-pad" style={{marginBottom:14}}>
+        <h2 style={{fontFamily:'var(--app-font-serif)',fontSize:16,margin:'0 0 12px',color:'#264333'}}>Payment Details</h2>
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:14}}>
+          <div className="field"><label>Payment Type</label><select value={f.paymentType} onChange={e=>set('paymentType',e.target.value)}>{['Cash','UPI','Canara Bank','SBI','HDFC Bank','ICICI Bank','Axis Bank','Cheque','Other'].map(p=><option key={p}>{p}</option>)}</select></div>
+          <div className="field"><label>Payment Ref No.</label><input value={f.paymentRef} onChange={e=>set('paymentRef',e.target.value)} placeholder="Reference No."/></div>
+        </div>
+      </section>
+      <section className="panel panel-pad" style={{marginBottom:14}}>
+        <h2 style={{fontFamily:'var(--app-font-serif)',fontSize:16,margin:'0 0 12px',color:'#4a90d9'}}>Transportation Details</h2>
+        <div className="field"><label>Description / Note</label><textarea value={f.notes} onChange={e=>set('notes',e.target.value)} placeholder="Add note…" style={{height:85,resize:'vertical'}}/></div>
+      </section>
+      <section className="panel" style={{marginBottom:28}}>
+        <button type="button" style={{width:'100%',display:'flex',justifyContent:'space-between',alignItems:'center',padding:'13px 18px',background:'transparent',border:'none',cursor:'pointer',fontFamily:'var(--app-font-serif)',fontSize:15,color:'#264333',fontWeight:600}} onClick={()=>setTermsOpen(o=>!o)}>
+          Terms & Conditions <ChevronDown size={15} style={{transition:'transform .22s',transform:termsOpen?'rotate(180deg)':'none'}}/>
+        </button>
+        {termsOpen&&<div style={{padding:'0 18px 16px',borderTop:'1px solid #e7e1d4'}}><div className="field" style={{paddingTop:14}}><label>Terms</label><textarea value={f.terms} onChange={e=>set('terms',e.target.value)} style={{height:100,resize:'vertical',fontSize:12}}/></div></div>}
+      </section>
+      <div style={{display:'flex',gap:10,justifyContent:'flex-end',paddingBottom:20}}>
+        <button className="btn" onClick={onClose}>Cancel</button>
+        {onDelete&&<button className="btn danger" onClick={onDelete}><Trash2/> Delete</button>}
+        <button className="btn primary" onClick={handleSave}><Save/> Save Invoice</button>
+      </div>
+    </main>
+  );
+}
+
 function ComingSoon({title,sub,Icon}:{title:string;sub:string;Icon:any}){
   return <main className="page"><div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',minHeight:'55vh',textAlign:'center',gap:14}}><div style={{width:60,height:60,borderRadius:18,background:'#e8f0e6',display:'grid',placeItems:'center',color:'#3d6b4a'}}><Icon size={26}/></div><h1 style={{fontFamily:'var(--app-font-serif)',fontSize:'clamp(22px,3vw,30px)',color:'#1e3d2c',margin:0}}>{title}</h1><p style={{fontSize:13,color:'#6d7d6e',maxWidth:380,margin:0,lineHeight:1.6}}>{sub}</p><span style={{fontSize:11,color:'#9aaa99',background:'#f0ede4',padding:'6px 14px',borderRadius:20,fontWeight:600}}>Coming soon</span></div></main>;
 }
@@ -151,7 +340,7 @@ function AppContent(){
       <Route path="/offers"><Offers {...context}/></Route>
       <Route path="/inventory"><Inventory {...context}/></Route>
       <Route path="/purchases"><Purchases {...context}/></Route>
-      <Route path="/sale/invoice"><ComingSoon title="Sale Invoice" sub="Create and manage sale invoices." Icon={FileText}/></Route>
+      <Route path="/sale/invoice"><SaleInvoicePage {...context}/></Route>
       <Route path="/sale/payment-in"><ComingSoon title="Payment-In" sub="Record incoming payments from customers." Icon={ArrowDownLeft}/></Route>
       <Route path="/sale/return"><ComingSoon title="Sale Return" sub="Process credit notes and book returns." Icon={RotateCcw}/></Route>
       <Route path="/sale/estimate"><ComingSoon title="Estimate / Quotation" sub="Send estimates and quotations to customers." Icon={ClipboardList}/></Route>
