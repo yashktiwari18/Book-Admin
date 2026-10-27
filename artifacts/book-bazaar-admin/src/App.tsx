@@ -1138,6 +1138,247 @@ function DeliveryChallanForm({data,initial,nextNo,nowTime,onSave,onClose,onDelet
   );
 }
 
+// ─────────────────────────── Sale Order ───────────────────────────
+const SALE_ORDER_KEY='bookbazaar-sale-order-v1';
+type SaleOrderItem={id:string;bookId:string;name:string;qty:number;price:number;discount:number};
+type SaleOrder={id:string;orderNo:string;date:string;deliveryDate:string;time:string;customerName:string;phone:string;address:string;items:SaleOrderItem[];subTotal:number;discountAmt:number;totalAmount:number;notes:string;status:'Draft'|'Confirmed'|'Packed'|'Dispatched'|'Delivered'|'Cancelled'};
+function SaleOrderPage(c:Context){
+  const [records,setRecords]=useState<SaleOrder[]>(()=>{try{const v=localStorage.getItem(SALE_ORDER_KEY);return v?JSON.parse(v):[];}catch{return [];}});
+  const [view,setView]=useState<'list'|'form'>('list');
+  const [editing,setEditing]=useState<SaleOrder|null>(null);
+  const [dateRange,setDateRange]=useState({from:today.slice(0,8)+'01',to:today});
+  const [statusFilter,setStatusFilter]=useState('All');
+  useEffect(()=>{localStorage.setItem(SALE_ORDER_KEY,JSON.stringify(records));},[records]);
+  const nowTime=()=>new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',hour12:true});
+  const nextNo=()=>`SO-${String(records.length+1).padStart(3,'0')}`;
+  const openNew=()=>{setEditing(null);setView('form');};
+  const openEdit=(r:SaleOrder)=>{setEditing(r);setView('form');};
+  const closeForm=()=>{setView('list');setEditing(null);};
+  const save=(r:SaleOrder,andNew?:boolean)=>{setRecords(prev=>editing?prev.map(x=>x.id===r.id?r:x):[r,...prev]);if(andNew)setEditing(null);else closeForm();};
+  const del=(id:string)=>setRecords(prev=>prev.filter(x=>x.id!==id));
+  if(view==='form')return <SaleOrderForm data={c.data} initial={editing} nextNo={nextNo()} nowTime={nowTime()} onSave={save} onClose={closeForm} onDelete={editing?()=>{del(editing.id);closeForm();}:undefined}/>;
+  const filtered=records.filter(r=>r.date>=dateRange.from&&r.date<=dateRange.to&&(statusFilter==='All'||r.status===statusFilter));
+  const statusColors:Record<string,string>={Draft:'#888',Confirmed:'#1565c0',Packed:'#7b1fa2',Dispatched:'#e65100',Delivered:'#2e7d32',Cancelled:'#a24840'};
+  const filterBar=(
+    <div style={{background:'#fff',borderBottom:'1px solid #e8e8e8',padding:'10px 20px',display:'flex',alignItems:'center',gap:12,flexWrap:'wrap'}}>
+      <select style={{border:'1px solid #ddd',borderRadius:6,padding:'6px 12px',fontSize:13,color:'#333',background:'#fafafa',outline:'none',cursor:'pointer'}}>
+        <option>This Month</option><option>Last Month</option><option>This Quarter</option><option>Custom</option>
+      </select>
+      <div style={{display:'flex',alignItems:'center',gap:8,fontSize:13,color:'#444'}}>
+        <CalendarDays size={16} style={{color:'#1976d2'}}/>
+        <input type="date" value={dateRange.from} onChange={e=>setDateRange(p=>({...p,from:e.target.value}))} style={{border:'none',background:'transparent',fontSize:13,color:'#333',outline:'none',cursor:'pointer'}}/>
+        <span style={{fontWeight:600,color:'#666'}}>TO</span>
+        <input type="date" value={dateRange.to} onChange={e=>setDateRange(p=>({...p,to:e.target.value}))} style={{border:'none',background:'transparent',fontSize:13,color:'#333',outline:'none',cursor:'pointer'}}/>
+      </div>
+      <select value={statusFilter} onChange={e=>setStatusFilter(e.target.value)} style={{border:'1px solid #ddd',borderRadius:6,padding:'6px 12px',fontSize:13,color:'#333',background:'#fafafa',outline:'none',cursor:'pointer',marginLeft:'auto'}}>
+        {['All','Draft','Confirmed','Packed','Dispatched','Delivered','Cancelled'].map(s=><option key={s}>{s}</option>)}
+      </select>
+    </div>
+  );
+  if(!records.length) return (
+    <main className="page">
+      {filterBar}
+      <div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',minHeight:'60vh',textAlign:'center',gap:14,background:'#eef4fb'}}>
+        <svg width="110" height="110" viewBox="0 0 110 110" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect x="18" y="20" width="74" height="72" rx="8" fill="#dce8f5"/>
+          <rect x="18" y="20" width="74" height="72" rx="8" stroke="#b8d0ea" strokeWidth="1.5"/>
+          <rect x="30" y="34" width="50" height="8" rx="3" fill="#f0f6ff"/>
+          <rect x="30" y="48" width="38" height="6" rx="3" fill="#e3eefa"/>
+          <rect x="30" y="60" width="44" height="6" rx="3" fill="#e3eefa"/>
+          <rect x="30" y="72" width="28" height="6" rx="3" fill="#e3eefa"/>
+          <circle cx="82" cy="82" r="16" fill="#1976d2"/>
+          <path d="M75 82 L80 87 L89 77" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
+        <h2 style={{fontFamily:'var(--app-font-serif)',fontSize:20,fontWeight:700,color:'#1a1a1a',margin:0}}>No Sale Orders Yet</h2>
+        <p style={{fontSize:13,color:'#6d7d6e',maxWidth:320,margin:0,lineHeight:1.6}}>Track and manage customer orders from confirmation to delivery — all in one place.</p>
+        <button className="btn primary" onClick={openNew} style={{marginTop:8,display:'flex',alignItems:'center',gap:7,fontSize:14}}>
+          <Plus size={15}/> Add Sale Order
+        </button>
+      </div>
+    </main>
+  );
+  const totalValue=filtered.reduce((s,r)=>s+r.totalAmount,0);
+  return (
+    <main className="page">
+      {filterBar}
+      <div style={{padding:'14px 20px 0',display:'flex',justifyContent:'flex-end'}}>
+        <button className="btn primary" onClick={openNew} style={{display:'flex',alignItems:'center',gap:7}}><Plus size={14}/> Add Sale Order</button>
+      </div>
+      <div className="stat-grid" style={{marginTop:14}}>
+        <Stat label="Total Orders" value={filtered.length} note="In selected period" Icon={ShoppingBag}/>
+        <Stat label="Order Value" value={money(totalValue)} note="Total billed" Icon={FileText}/>
+        <Stat label="Confirmed" value={filtered.filter(r=>r.status==='Confirmed').length} note="Awaiting fulfilment" Icon={Check}/>
+        <Stat label="Delivered" value={filtered.filter(r=>r.status==='Delivered').length} note="Completed" Icon={Check} tint="green"/>
+      </div>
+      <section className="panel">
+        <div className="table-wrap"><table className="data-table">
+          <thead><tr><th>Order No.</th><th>Customer</th><th>Order Date</th><th>Delivery Date</th><th>Items</th><th>Total</th><th>Status</th><th></th></tr></thead>
+          <tbody>{filtered.map(r=>(
+            <tr key={r.id}>
+              <td><div className="book-title">{r.orderNo}</div><div className="muted">{r.time}</div></td>
+              <td><div className="book-title">{r.customerName||'—'}</div><div className="muted">{r.phone}</div></td>
+              <td>{r.date}</td>
+              <td>{r.deliveryDate||'—'}</td>
+              <td>{r.items.length} item{r.items.length!==1?'s':''}</td>
+              <td style={{fontWeight:600}}>{money(r.totalAmount)}</td>
+              <td><span style={{fontSize:12,fontWeight:600,padding:'3px 8px',borderRadius:12,background:`${statusColors[r.status]}18`,color:statusColors[r.status]}}>{r.status}</span></td>
+              <td><div className="row-actions"><button className="icon-button" title="Edit" onClick={()=>openEdit(r)}><Pencil/></button><button className="icon-button" title="Delete" onClick={()=>del(r.id)}><Trash2/></button></div></td>
+            </tr>
+          ))}</tbody>
+        </table></div>
+      </section>
+    </main>
+  );
+}
+function SaleOrderForm({data,initial,nextNo,nowTime,onSave,onClose,onDelete}:{data:Dataset;initial:SaleOrder|null;nextNo:string;nowTime:string;onSave:(r:SaleOrder,andNew?:boolean)=>void;onClose:()=>void;onDelete?:()=>void}){
+  const blank:Omit<SaleOrder,'id'>={orderNo:nextNo,date:today,deliveryDate:'',time:nowTime,customerName:'',phone:'',address:'',items:[],subTotal:0,discountAmt:0,totalAmount:0,notes:'',status:'Draft'};
+  const [f,setF]=useState<Omit<SaleOrder,'id'>>(initial||blank);
+  const [showItems,setShowItems]=useState(false);
+  const [selBook,setSelBook]=useState('');
+  const [selQty,setSelQty]=useState(1);
+  const [selDisc,setSelDisc]=useState(0);
+  const [validationMsg,setValidationMsg]=useState('');
+  const set=(k:string,v:any)=>setF(p=>({...p,[k]:v}));
+  useEffect(()=>{if(!validationMsg)return;const t=setTimeout(()=>setValidationMsg(''),2800);return()=>clearTimeout(t);},[validationMsg]);
+  const recalc=(items:SaleOrderItem[])=>{const sub=items.reduce((s,i)=>s+i.qty*i.price,0);const disc=items.reduce((s,i)=>s+i.qty*i.price*(i.discount/100),0);return{subTotal:sub,discountAmt:disc,totalAmount:sub-disc};};
+  const addItem=()=>{const book=data.books.find(b=>b.id===selBook);if(!book)return;const newItem={id:idFor('SOI'),bookId:book.id,name:book.title,qty:selQty,price:book.price,discount:selDisc};const items=[...f.items,newItem];setF(p=>({...p,items,...recalc(items)}));setSelBook('');setSelQty(1);setSelDisc(0);setShowItems(false);};
+  const removeItem=(id:string)=>{const items=f.items.filter(i=>i.id!==id);setF(p=>({...p,items,...recalc(items)}));};
+  const handleSave=(andNew=false)=>{if(!f.customerName.trim()){setValidationMsg('Customer name is required');return;}if(!f.items.length&&!f.totalAmount){setValidationMsg('Add at least one item or enter a total');return;}const rec:SaleOrder={...f,id:initial?.id||idFor('SO')};onSave(rec,andNew);if(andNew)setF({...blank,orderNo:`SO-${String(Number(f.orderNo.replace('SO-',''))+1).padStart(3,'0')}`});};
+  const STATUS_OPTS=['Draft','Confirmed','Packed','Dispatched','Delivered','Cancelled'] as const;
+  const statusColor=(s:string)=>({Draft:'#888',Confirmed:'#1565c0',Packed:'#7b1fa2',Dispatched:'#e65100',Delivered:'#2e7d32',Cancelled:'#a24840'} as Record<string,string>)[s]||'#888';
+  return(
+    <main style={{minHeight:'100vh',background:'#f5f5f5',display:'flex',flexDirection:'column',maxWidth:520,margin:'0 auto',position:'relative',paddingBottom:80}}>
+      {/* Header */}
+      <div style={{background:'#fff',borderBottom:'1px solid #e8e8e8',padding:'14px 16px',display:'flex',alignItems:'center',justifyContent:'space-between',position:'sticky',top:0,zIndex:10}}>
+        <div style={{display:'flex',alignItems:'center',gap:12}}>
+          <button onClick={onClose} style={{background:'none',border:'none',cursor:'pointer',padding:4,display:'flex',alignItems:'center',color:'#333'}}><ArrowRight style={{transform:'rotate(180deg)'}} size={22}/></button>
+          <h1 style={{fontSize:18,fontWeight:700,color:'#1a1a1a',margin:0}}>Sale Order</h1>
+        </div>
+        <div style={{display:'flex',alignItems:'center',gap:8}}>
+          <span style={{fontSize:12,fontWeight:600,padding:'4px 10px',borderRadius:20,background:`${statusColor(f.status)}18`,color:statusColor(f.status)}}>{f.status}</span>
+          {onDelete&&<button onClick={onDelete} style={{background:'none',border:'none',cursor:'pointer',color:'#e53935',display:'flex'}}><Trash2 size={15}/></button>}
+        </div>
+      </div>
+      {/* Order No + Date */}
+      <div style={{background:'#fff',borderBottom:'1px solid #eee',padding:'12px 16px',display:'grid',gridTemplateColumns:'1fr 1px 1fr',gap:0}}>
+        <div style={{paddingRight:16}}>
+          <div style={{fontSize:11,color:'#999',marginBottom:3}}>Order No.</div>
+          <div style={{display:'flex',alignItems:'center',gap:6}}>
+            <input value={f.orderNo} onChange={e=>set('orderNo',e.target.value)} style={{border:'none',background:'transparent',fontSize:15,fontWeight:600,color:'#1a1a1a',width:'90px',outline:'none',padding:0}}/>
+            <ChevronDown size={14} style={{color:'#999'}}/>
+          </div>
+        </div>
+        <div style={{background:'#e0e0e0',width:1,margin:'4px 0'}}/>
+        <div style={{paddingLeft:16}}>
+          <div style={{fontSize:11,color:'#999',marginBottom:3}}>Order Date</div>
+          <input type="date" value={f.date} onChange={e=>set('date',e.target.value)} style={{border:'none',background:'transparent',fontSize:14,fontWeight:500,color:'#1a1a1a',outline:'none',padding:0,width:130}}/>
+        </div>
+      </div>
+      {/* Customer Name */}
+      <div style={{background:'#fff',marginTop:8,padding:'4px 16px 4px'}}>
+        <div style={{position:'relative',border:'2px solid #1976d2',borderRadius:6,padding:'16px 12px 8px'}}>
+          <label style={{position:'absolute',top:-10,left:10,background:'#fff',padding:'0 4px',fontSize:12,color:'#1976d2',fontWeight:500}}>Customer Name *</label>
+          <input value={f.customerName} onChange={e=>set('customerName',e.target.value)} style={{border:'none',background:'transparent',fontSize:15,color:'#1a1a1a',width:'100%',outline:'none',padding:0}}/>
+        </div>
+      </div>
+      {/* Phone */}
+      <div style={{background:'#fff',marginTop:10,padding:'4px 16px 10px'}}>
+        <div style={{border:'1px solid #ccc',borderRadius:6,padding:'14px 12px'}}>
+          <input value={f.phone} onChange={e=>set('phone',e.target.value)} placeholder="Phone Number" style={{border:'none',background:'transparent',fontSize:15,color:'#1a1a1a',width:'100%',outline:'none',padding:0}}/>
+        </div>
+      </div>
+      {/* Delivery Date + Status */}
+      <div style={{background:'#fff',marginTop:8,padding:'12px 16px',display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
+        <div style={{border:'1px solid #ccc',borderRadius:6,padding:'12px'}}>
+          <div style={{fontSize:11,color:'#aaa',marginBottom:4}}>Delivery Date</div>
+          <div style={{display:'flex',alignItems:'center',gap:6}}>
+            <input type="date" value={f.deliveryDate} onChange={e=>set('deliveryDate',e.target.value)} style={{border:'none',background:'transparent',fontSize:13,color:'#333',outline:'none',padding:0,flex:1}}/>
+            <CalendarDays size={13} style={{color:'#aaa',flexShrink:0}}/>
+          </div>
+        </div>
+        <div style={{border:'1px solid #ccc',borderRadius:6,padding:'12px'}}>
+          <div style={{fontSize:11,color:'#aaa',marginBottom:4}}>Status</div>
+          <select value={f.status} onChange={e=>set('status',e.target.value as SaleOrder['status'])} style={{border:'none',background:'transparent',fontSize:13,color:statusColor(f.status),fontWeight:600,width:'100%',outline:'none',padding:0}}>
+            {STATUS_OPTS.map(s=><option key={s} value={s}>{s}</option>)}
+          </select>
+        </div>
+      </div>
+      {/* Delivery Address */}
+      <div style={{background:'#fff',marginTop:8,padding:'12px 16px'}}>
+        <label style={{fontSize:12,color:'#888',display:'block',marginBottom:6}}>Delivery Address (Optional)</label>
+        <textarea value={f.address} onChange={e=>set('address',e.target.value)} placeholder="Enter delivery address…" style={{width:'100%',border:'1px solid #ddd',borderRadius:6,padding:'10px',fontSize:14,background:'#fafafa',resize:'vertical',height:56,outline:'none',boxSizing:'border-box'}}/>
+      </div>
+      {/* Add Items */}
+      <div style={{background:'#fff',marginTop:8,padding:'0 16px 8px'}}>
+        <button onClick={()=>setShowItems(v=>!v)} style={{width:'100%',display:'flex',alignItems:'center',justifyContent:'center',gap:8,padding:'14px',border:'1px solid #1976d2',borderRadius:6,background:'#fff',color:'#1976d2',fontSize:14,fontWeight:600,cursor:'pointer'}}>
+          <span style={{width:22,height:22,borderRadius:'50%',background:'#1976d2',color:'#fff',display:'flex',alignItems:'center',justifyContent:'center',fontSize:16,fontWeight:900,lineHeight:'1'}}>+</span>
+          Add Items <span style={{fontWeight:400,color:'#999'}}>(Optional)</span>
+        </button>
+        {showItems&&(
+          <div style={{marginTop:10,border:'1px solid #e0e0e0',borderRadius:6,padding:'12px'}}>
+            <div style={{display:'grid',gridTemplateColumns:'2fr 1fr 1fr auto',gap:8,alignItems:'flex-end',marginBottom:8}}>
+              <div><div style={{fontSize:11,color:'#888',marginBottom:4}}>Book</div>
+                <select value={selBook} onChange={e=>setSelBook(e.target.value)} style={{width:'100%',border:'1px solid #ddd',borderRadius:5,padding:'7px',fontSize:13,outline:'none'}}>
+                  <option value="">Select…</option>{data.books.map(b=><option key={b.id} value={b.id}>{b.title}</option>)}
+                </select>
+              </div>
+              <div><div style={{fontSize:11,color:'#888',marginBottom:4}}>Qty</div>
+                <input type="number" min="1" value={selQty} onChange={e=>setSelQty(Number(e.target.value))} style={{width:'100%',border:'1px solid #ddd',borderRadius:5,padding:'7px',fontSize:13,outline:'none'}}/>
+              </div>
+              <div><div style={{fontSize:11,color:'#888',marginBottom:4}}>Disc %</div>
+                <input type="number" min="0" max="100" value={selDisc} onChange={e=>setSelDisc(Number(e.target.value))} style={{width:'100%',border:'1px solid #ddd',borderRadius:5,padding:'7px',fontSize:13,outline:'none'}}/>
+              </div>
+              <button onClick={addItem} className="btn primary" style={{padding:'7px 10px',height:34,alignSelf:'flex-end'}}><Plus size={13}/></button>
+            </div>
+            {f.items.map(item=>(
+              <div key={item.id} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'8px 0',borderTop:'1px solid #f0f0f0'}}>
+                <div><div style={{fontSize:13,fontWeight:600,color:'#1a1a1a'}}>{item.name}</div><div style={{fontSize:11,color:'#888'}}>{item.qty} × {money(item.price)}{item.discount>0?` − ${item.discount}%`:''}</div></div>
+                <div style={{display:'flex',alignItems:'center',gap:8}}><span style={{fontWeight:600}}>{money(item.qty*item.price*(1-item.discount/100))}</span><button onClick={()=>removeItem(item.id)} style={{background:'none',border:'none',cursor:'pointer',color:'#ccc',display:'flex'}}><Trash2 size={14}/></button></div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+      {/* Totals */}
+      <div style={{background:'#fff',marginTop:8,padding:'0 16px'}}>
+        {f.items.length>0&&<>
+          <div style={{display:'flex',justifyContent:'space-between',padding:'12px 0',borderBottom:'1px dashed #eee',fontSize:14,color:'#555'}}>
+            <span>Sub Total</span><span>{money(f.subTotal)}</span>
+          </div>
+          {f.discountAmt>0&&<div style={{display:'flex',justifyContent:'space-between',padding:'10px 0',borderBottom:'1px dashed #eee',fontSize:14,color:'#a24840'}}>
+            <span>Discount</span><span>− {money(f.discountAmt)}</span>
+          </div>}
+        </>}
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'16px 0'}}>
+          <span style={{fontSize:15,fontWeight:700,color:'#1a1a1a'}}>Total Amount</span>
+          <div style={{display:'flex',alignItems:'center',gap:4}}>
+            <span style={{fontSize:15,color:'#1a1a1a'}}>₹</span>
+            <div style={{borderBottom:'1px dashed #aaa',minWidth:140,paddingBottom:2}}>
+              <input type="number" min="0" value={f.totalAmount||''} onChange={e=>set('totalAmount',Number(e.target.value))} style={{border:'none',background:'transparent',fontSize:15,fontWeight:600,color:'#1a1a1a',width:'100%',outline:'none',padding:0,textAlign:'right'}}/>
+            </div>
+          </div>
+        </div>
+      </div>
+      {/* Notes */}
+      <div style={{background:'#fff',marginTop:8,padding:'12px 16px'}}>
+        <label style={{fontSize:12,color:'#888',display:'block',marginBottom:6}}>Notes (Optional)</label>
+        <textarea value={f.notes} onChange={e=>set('notes',e.target.value)} placeholder="Add order notes or special instructions…" style={{width:'100%',border:'1px solid #ddd',borderRadius:6,padding:'10px',fontSize:14,background:'#fafafa',resize:'vertical',height:72,outline:'none',boxSizing:'border-box'}}/>
+      </div>
+      {validationMsg&&(
+        <div style={{position:'fixed',bottom:90,left:'50%',transform:'translateX(-50%)',background:'rgba(40,40,40,0.92)',color:'#fff',borderRadius:28,padding:'12px 20px',display:'flex',alignItems:'center',gap:10,fontSize:14,fontWeight:500,zIndex:999,boxShadow:'0 4px 20px rgba(0,0,0,0.25)',whiteSpace:'nowrap'}}>
+          <span style={{width:22,height:22,background:'#e53935',borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center',fontSize:13,flexShrink:0}}>!</span>
+          {validationMsg}
+        </div>
+      )}
+      <div style={{position:'fixed',bottom:0,left:'50%',transform:'translateX(-50%)',width:'100%',maxWidth:520,background:'#fff',borderTop:'1px solid #e8e8e8',display:'grid',gridTemplateColumns:'1fr 1fr auto',zIndex:10}}>
+        <button onClick={()=>handleSave(true)} style={{padding:'16px 0',background:'#fff',border:'none',borderRight:'1px solid #e8e8e8',fontSize:14,fontWeight:600,color:'#555',cursor:'pointer'}} onMouseEnter={e=>(e.currentTarget as HTMLButtonElement).style.background='#f5f5f5'} onMouseLeave={e=>(e.currentTarget as HTMLButtonElement).style.background='#fff'}>Save &amp; New</button>
+        <button onClick={()=>handleSave(false)} style={{padding:'16px 0',background:'#1565c0',border:'none',fontSize:14,fontWeight:700,color:'#fff',cursor:'pointer'}} onMouseEnter={e=>(e.currentTarget as HTMLButtonElement).style.background='#0d47a1'} onMouseLeave={e=>(e.currentTarget as HTMLButtonElement).style.background='#1565c0'}>Save</button>
+        <button style={{padding:'16px 18px',background:'#fff',border:'none',borderLeft:'1px solid #e8e8e8',fontSize:20,color:'#555',cursor:'pointer',lineHeight:1}} title="More options">⋮</button>
+      </div>
+    </main>
+  );
+}
+
 function ComingSoon({title,sub,Icon}:{title:string;sub:string;Icon:any}){
   return <main className="page"><div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',minHeight:'55vh',textAlign:'center',gap:14}}><div style={{width:60,height:60,borderRadius:18,background:'#e8f0e6',display:'grid',placeItems:'center',color:'#3d6b4a'}}><Icon size={26}/></div><h1 style={{fontFamily:'var(--app-font-serif)',fontSize:'clamp(22px,3vw,30px)',color:'#1e3d2c',margin:0}}>{title}</h1><p style={{fontSize:13,color:'#6d7d6e',maxWidth:380,margin:0,lineHeight:1.6}}>{sub}</p><span style={{fontSize:11,color:'#9aaa99',background:'#f0ede4',padding:'6px 14px',borderRadius:20,fontWeight:600}}>Coming soon</span></div></main>;
 }
@@ -1224,7 +1465,7 @@ function AppContent(){
       <Route path="/sale/return"><SaleReturnPage {...context}/></Route>
       <Route path="/sale/estimate"><EstimatePage {...context}/></Route>
       <Route path="/sale/proforma"><ComingSoon title="Proforma Invoice" sub="Issue proforma invoices before final billing." Icon={FilePen}/></Route>
-      <Route path="/sale/order"><ComingSoon title="Sale Order" sub="Track and manage customer orders." Icon={ShoppingBag}/></Route>
+      <Route path="/sale/order"><SaleOrderPage {...context}/></Route>
       <Route path="/sale/challan"><DeliveryChallanPage {...context}/></Route>
       <Route path="/sale/pos"><ComingSoon title="Mobile POS" sub="Quick point-of-sale billing on the go." Icon={Smartphone}/></Route>
       <Route path="/purchases"><Purchases {...context}/></Route>
