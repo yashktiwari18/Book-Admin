@@ -259,6 +259,885 @@ function InvoiceForm({data,initial,nextNo,nowTime,onSave,onClose,onDelete}:{data
   );
 }
 
+// ─────────────────────── Payment-In Types & Components ───────────────────────
+const PAYMENT_IN_KEY='bookbazaar-payment-in-v1';
+type PaymentIn={id:string;receiptNo:string;date:string;time:string;customerName:string;billingName:string;phone:string;partyBalance:number;discountAmount:number;received:number;totalAmount:number;paymentType:string;paymentRef:string;notes:string};
+function PaymentInPage(c:Context){
+  const [records,setRecords]=useState<PaymentIn[]>(()=>{try{const v=localStorage.getItem(PAYMENT_IN_KEY);return v?JSON.parse(v):[];}catch{return [];}});
+  const [view,setView]=useState<'list'|'form'>('list');
+  const [editing,setEditing]=useState<PaymentIn|null>(null);
+  useEffect(()=>{localStorage.setItem(PAYMENT_IN_KEY,JSON.stringify(records));},[records]);
+  const nowTime=()=>new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',hour12:true});
+  const nextNo=()=>`${records.length+1}`;
+  const openNew=()=>{setEditing(null);setView('form');};
+  const openNew2=()=>{setEditing(null);setView('form');};
+  const openEdit=(r:PaymentIn)=>{setEditing(r);setView('form');};
+  const closeForm=()=>{setView('list');setEditing(null);};
+  const save=(r:PaymentIn,andNew?:boolean)=>{setRecords(prev=>editing?prev.map(x=>x.id===r.id?r:x):[r,...prev]);if(andNew){setEditing(null);}else{closeForm();}};
+  const del=(id:string)=>setRecords(prev=>prev.filter(x=>x.id!==id));
+  if(view==='form')return <PaymentInForm initial={editing} nextNo={nextNo()} nowTime={nowTime()} onSave={save} onClose={closeForm} onDelete={editing?()=>{del(editing.id);closeForm();}:undefined}/>;
+  const totalReceived=records.reduce((s,r)=>s+r.received,0);
+  const totalDiscount=records.reduce((s,r)=>s+r.discountAmount,0);
+  const totalBalance=records.reduce((s,r)=>s+Math.max(0,r.totalAmount-r.received),0);
+  // Empty state
+  if(!records.length) return (
+    <main className="page">
+      <div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',minHeight:'70vh',textAlign:'center',gap:14}}>
+        <div style={{width:64,height:64,borderRadius:18,background:'#e8f0e6',display:'grid',placeItems:'center',color:'#3d6b4a',marginBottom:4}}>
+          <ArrowDownLeft size={28}/>
+        </div>
+        <h1 style={{fontFamily:'var(--app-font-serif)',fontSize:'clamp(22px,3vw,28px)',color:'#1e3d2c',margin:0}}>Add your first Payment In</h1>
+        <p style={{fontSize:13,color:'#6d7d6e',maxWidth:360,margin:0,lineHeight:1.6}}>Record payment received from parties and easily link them to your current invoices.</p>
+        <button className="btn primary" onClick={openNew} style={{marginTop:8,display:'flex',alignItems:'center',gap:7,fontSize:14}}>
+          <Plus size={15}/> Take Payment
+        </button>
+      </div>
+    </main>
+  );
+  return(
+    <main className="page">
+      <Heading eyebrow="Sale" title="Payment-In" subtitle="Record and manage incoming payments from customers.">
+        <button className="btn primary" onClick={openNew} style={{display:'flex',alignItems:'center',gap:7}}>
+          <Plus size={15}/> Take Payment
+        </button>
+      </Heading>
+      <div className="stat-grid">
+        <Stat label="Total Receipts" value={records.length} note="All time" Icon={ArrowDownLeft}/>
+        <Stat label="Total Received" value={money(totalReceived)} note="Gross payments in" Icon={Check}/>
+        <Stat label="Discount Given" value={money(totalDiscount)} note="Total discounts applied" Icon={FileText}/>
+        <Stat label="Balance Pending" value={money(totalBalance)} note="Outstanding" Icon={TriangleAlert} tint="red"/>
+      </div>
+      <section className="panel">
+        <div className="table-wrap"><table className="data-table">
+          <thead><tr><th>Receipt No.</th><th>Customer</th><th>Date</th><th>Received</th><th>Total Amount</th><th>Balance</th><th>Payment Type</th><th></th></tr></thead>
+          <tbody>{records.map(r=>{const bal=Math.max(0,r.totalAmount-r.received);return(
+            <tr key={r.id}>
+              <td><div className="book-title">#{r.receiptNo}</div><div className="muted">{r.time}</div></td>
+              <td><div className="book-title">{r.customerName||'—'}</div><div className="muted">{r.phone}</div></td>
+              <td>{r.date}</td>
+              <td style={{color:'#3a6647',fontWeight:600}}>{money(r.received)}</td>
+              <td style={{fontWeight:600}}>{r.totalAmount>0?money(r.totalAmount):'—'}</td>
+              <td style={{color:bal>0?'#a24840':'#3a6647',fontWeight:600}}>{money(bal)}</td>
+              <td><span className="pill neutral">{r.paymentType}</span></td>
+              <td><div className="row-actions"><button className="icon-button" title="Edit" onClick={()=>openEdit(r)}><Pencil/></button><button className="icon-button" title="Delete" onClick={()=>del(r.id)}><Trash2/></button></div></td>
+            </tr>
+          );})}
+          </tbody>
+        </table>
+        </div>
+      </section>
+    </main>
+  );
+}
+function PaymentInForm({initial,nextNo,nowTime,onSave,onClose,onDelete}:{initial:PaymentIn|null;nextNo:string;nowTime:string;onSave:(r:PaymentIn,andNew?:boolean)=>void;onClose:()=>void;onDelete?:()=>void}){
+  const todayStr=new Date().toLocaleDateString('en-IN',{day:'2-digit',month:'2-digit',year:'numeric'});
+  const blank:Omit<PaymentIn,'id'>={receiptNo:nextNo,date:today,time:nowTime,customerName:'',billingName:'',phone:'',partyBalance:0,discountAmount:0,received:0,totalAmount:0,paymentType:'Cash',paymentRef:'',notes:''};
+  const [f,setF]=useState<Omit<PaymentIn,'id'>>(initial||blank);
+  const [validationMsg,setValidationMsg]=useState('');
+  const set=(k:string,v:any)=>setF(p=>({...p,[k]:v}));
+  // validation toast auto-hide
+  useEffect(()=>{if(!validationMsg)return;const t=setTimeout(()=>setValidationMsg(''),2800);return()=>clearTimeout(t);},[validationMsg]);
+  const handleSave=(andNew=false)=>{
+    if(!f.totalAmount||f.totalAmount<=0){setValidationMsg("Total amount can't be empty");return;}
+    const rec:PaymentIn={...f,id:initial?.id||idFor('PMT')};
+    onSave(rec,andNew);
+    if(andNew) setF({...blank,receiptNo:String(Number(f.receiptNo)+1)});
+  };
+  // format date for display like reference image
+  const displayDate=f.date?new Date(f.date).toLocaleDateString('en-IN',{day:'2-digit',month:'2-digit',year:'numeric'}):todayStr;
+  return(
+    <main style={{minHeight:'100vh',background:'#f5f5f5',display:'flex',flexDirection:'column',maxWidth:520,margin:'0 auto',position:'relative',paddingBottom:80}}>
+      {/* Header bar */}
+      <div style={{background:'#fff',borderBottom:'1px solid #e8e8e8',padding:'14px 16px',display:'flex',alignItems:'center',justifyContent:'space-between',position:'sticky',top:0,zIndex:10}}>
+        <div style={{display:'flex',alignItems:'center',gap:12}}>
+          <button onClick={onClose} style={{background:'none',border:'none',cursor:'pointer',padding:4,display:'flex',alignItems:'center',color:'#333'}}><ArrowRight style={{transform:'rotate(180deg)'}} size={22}/></button>
+          <h1 style={{fontSize:18,fontWeight:700,color:'#1a1a1a',margin:0}}>Payment-In</h1>
+        </div>
+        {onDelete&&<button onClick={onDelete} style={{background:'none',border:'none',cursor:'pointer',color:'#e53935',fontSize:13,fontWeight:600,display:'flex',alignItems:'center',gap:4}}><Trash2 size={15}/></button>}
+      </div>
+
+      {/* Receipt No + Date row */}
+      <div style={{background:'#fff',borderBottom:'1px solid #eee',padding:'12px 16px',display:'grid',gridTemplateColumns:'1fr 1px 1fr',gap:0}}>
+        <div style={{paddingRight:16}}>
+          <div style={{fontSize:11,color:'#999',marginBottom:3}}>Receipt No.</div>
+          <div style={{display:'flex',alignItems:'center',gap:6}}>
+            <input
+              value={f.receiptNo}
+              onChange={e=>set('receiptNo',e.target.value)}
+              style={{border:'none',background:'transparent',fontSize:15,fontWeight:600,color:'#1a1a1a',width:'60px',outline:'none',padding:0}}
+            />
+            <ChevronDown size={14} style={{color:'#999'}}/>
+          </div>
+        </div>
+        <div style={{background:'#e0e0e0',width:1,margin:'4px 0'}}/>
+        <div style={{paddingLeft:16}}>
+          <div style={{fontSize:11,color:'#999',marginBottom:3}}>Date</div>
+          <div style={{display:'flex',alignItems:'center',gap:6}}>
+            <input
+              type="date"
+              value={f.date}
+              onChange={e=>set('date',e.target.value)}
+              style={{border:'none',background:'transparent',fontSize:14,fontWeight:500,color:'#1a1a1a',outline:'none',padding:0,width:130}}
+            />
+            <ChevronDown size={14} style={{color:'#999'}}/>
+          </div>
+        </div>
+      </div>
+
+      {/* Customer Name */}
+      <div style={{background:'#fff',marginTop:8,padding:'4px 16px 4px'}}>
+        <div style={{position:'relative',border:'2px solid #1976d2',borderRadius:6,padding:'16px 12px 8px'}}>
+          <label style={{position:'absolute',top:-10,left:10,background:'#fff',padding:'0 4px',fontSize:12,color:'#1976d2',fontWeight:500}}>Customer Name *</label>
+          <input
+            value={f.customerName}
+            onChange={e=>{set('customerName',e.target.value);if(!f.billingName||f.billingName===f.customerName)set('billingName',e.target.value);}}
+            placeholder=""
+            style={{border:'none',background:'transparent',fontSize:15,color:'#1a1a1a',width:'100%',outline:'none',padding:0}}
+          />
+        </div>
+      </div>
+
+      {/* Phone Number */}
+      <div style={{background:'#fff',marginTop:10,padding:'4px 16px 12px'}}>
+        <div style={{border:'1px solid #ccc',borderRadius:6,padding:'14px 12px'}}>
+          <input
+            value={f.phone}
+            onChange={e=>set('phone',e.target.value)}
+            placeholder="Phone Number"
+            style={{border:'none',background:'transparent',fontSize:15,color:'#1a1a1a',width:'100%',outline:'none',padding:0}}
+          />
+        </div>
+      </div>
+
+      {/* Received + Total Amount */}
+      <div style={{background:'#fff',marginTop:8,padding:'0 16px'}}>
+        {/* Received row */}
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'16px 0',borderBottom:'1px dashed #e0e0e0'}}>
+          <span style={{fontSize:15,fontWeight:500,color:'#1a1a1a'}}>Received</span>
+          <div style={{display:'flex',alignItems:'center',gap:4}}>
+            <span style={{fontSize:15,color:'#1a1a1a'}}>₹</span>
+            <div style={{borderBottom:'1px dashed #aaa',minWidth:140,paddingBottom:2}}>
+              <input
+                type="number"
+                min="0"
+                value={f.received||''}
+                onChange={e=>set('received',Number(e.target.value))}
+                placeholder=""
+                style={{border:'none',background:'transparent',fontSize:15,color:'#1a1a1a',width:'100%',outline:'none',padding:0,textAlign:'right'}}
+              />
+            </div>
+          </div>
+        </div>
+        {/* Total Amount row */}
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'16px 0'}}>
+          <span style={{fontSize:15,fontWeight:600,color:'#3a6647'}}>Total Amount</span>
+          <div style={{display:'flex',alignItems:'center',gap:4}}>
+            <span style={{fontSize:15,color:'#3a6647'}}>₹</span>
+            <div style={{borderBottom:'1px solid #ccc',minWidth:140,paddingBottom:2}}>
+              <input
+                type="number"
+                min="0"
+                value={f.totalAmount||''}
+                onChange={e=>set('totalAmount',Number(e.target.value))}
+                placeholder=""
+                style={{border:'none',background:'transparent',fontSize:15,fontWeight:600,color:'#3a6647',width:'100%',outline:'none',padding:0,textAlign:'right'}}
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Payment Method */}
+      <div style={{background:'#fff',marginTop:8,padding:'12px 16px'}}>
+        <div style={{fontSize:12,color:'#666',marginBottom:8,fontWeight:600,letterSpacing:'0.5px'}}>PAYMENT METHOD</div>
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
+          <div>
+            <label style={{fontSize:12,color:'#888',display:'block',marginBottom:4}}>Payment Type</label>
+            <select value={f.paymentType} onChange={e=>set('paymentType',e.target.value)} style={{width:'100%',border:'1px solid #ddd',borderRadius:6,padding:'8px 10px',fontSize:14,background:'#fafafa',color:'#1a1a1a',outline:'none'}}>
+              {['Cash','UPI','Canara Bank','SBI','HDFC Bank','ICICI Bank','Axis Bank','Cheque','Other'].map(p=><option key={p}>{p}</option>)}
+            </select>
+          </div>
+          <div>
+            <label style={{fontSize:12,color:'#888',display:'block',marginBottom:4}}>Reference No.</label>
+            <input value={f.paymentRef} onChange={e=>set('paymentRef',e.target.value)} placeholder="Ref No." style={{width:'100%',border:'1px solid #ddd',borderRadius:6,padding:'8px 10px',fontSize:14,background:'#fafafa',color:'#1a1a1a',outline:'none',boxSizing:'border-box'}}/>
+          </div>
+        </div>
+      </div>
+
+      {/* Notes */}
+      <div style={{background:'#fff',marginTop:8,padding:'12px 16px'}}>
+        <label style={{fontSize:12,color:'#888',display:'block',marginBottom:6}}>Notes (Optional)</label>
+        <textarea value={f.notes} onChange={e=>set('notes',e.target.value)} placeholder="Add a note…" style={{width:'100%',border:'1px solid #ddd',borderRadius:6,padding:'10px',fontSize:14,background:'#fafafa',resize:'vertical',height:72,outline:'none',boxSizing:'border-box'}}/>
+      </div>
+
+      {/* Validation Toast */}
+      {validationMsg&&(
+        <div style={{position:'fixed',bottom:90,left:'50%',transform:'translateX(-50%)',background:'rgba(40,40,40,0.92)',color:'#fff',borderRadius:28,padding:'12px 20px',display:'flex',alignItems:'center',gap:10,fontSize:14,fontWeight:500,zIndex:999,boxShadow:'0 4px 20px rgba(0,0,0,0.25)',whiteSpace:'nowrap'}}>
+          <span style={{width:22,height:22,background:'#e53935',borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center',fontSize:13,flexShrink:0}}>!</span>
+          {validationMsg}
+        </div>
+      )}
+
+      {/* Bottom Action Bar */}
+      <div style={{position:'fixed',bottom:0,left:'50%',transform:'translateX(-50%)',width:'100%',maxWidth:520,background:'#fff',borderTop:'1px solid #e8e8e8',display:'grid',gridTemplateColumns:'1fr 1fr auto',zIndex:10}}>
+        <button
+          onClick={()=>handleSave(true)}
+          style={{padding:'16px 0',background:'#fff',border:'none',borderRight:'1px solid #e8e8e8',fontSize:14,fontWeight:600,color:'#555',cursor:'pointer',transition:'background .15s'}}
+          onMouseEnter={e=>(e.currentTarget as HTMLButtonElement).style.background='#f5f5f5'}
+          onMouseLeave={e=>(e.currentTarget as HTMLButtonElement).style.background='#fff'}
+        >Save &amp; New</button>
+        <button
+          onClick={()=>handleSave(false)}
+          style={{padding:'16px 0',background:'#1565c0',border:'none',fontSize:14,fontWeight:700,color:'#fff',cursor:'pointer',transition:'background .15s'}}
+          onMouseEnter={e=>(e.currentTarget as HTMLButtonElement).style.background='#0d47a1'}
+          onMouseLeave={e=>(e.currentTarget as HTMLButtonElement).style.background='#1565c0'}
+        >Save</button>
+        <button
+          style={{padding:'16px 18px',background:'#fff',border:'none',borderLeft:'1px solid #e8e8e8',fontSize:20,color:'#555',cursor:'pointer',lineHeight:1}}
+          title="More options"
+        >⋮</button>
+      </div>
+    </main>
+  );
+}
+
+// ─────────────────────────── Sale Return (Credit Note) ───────────────────────────
+const SALE_RETURN_KEY='bookbazaar-sale-return-v1';
+type SaleReturnItem={id:string;bookId:string;name:string;qty:number;price:number};
+type SaleReturn={id:string;returnNo:string;date:string;time:string;customerName:string;phone:string;invoiceDate:string;invoiceNo:string;items:SaleReturnItem[];totalAmount:number;notes:string};
+function SaleReturnPage(c:Context){
+  const [records,setRecords]=useState<SaleReturn[]>(()=>{try{const v=localStorage.getItem(SALE_RETURN_KEY);return v?JSON.parse(v):[];}catch{return [];}});
+  const [view,setView]=useState<'list'|'form'>('list');
+  const [editing,setEditing]=useState<SaleReturn|null>(null);
+  const [dateRange,setDateRange]=useState({from:today.slice(0,8)+'01',to:today});
+  useEffect(()=>{localStorage.setItem(SALE_RETURN_KEY,JSON.stringify(records));},[records]);
+  const nowTime=()=>new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',hour12:true});
+  const nextNo=()=>`${records.length+1}`;
+  const openNew=()=>{setEditing(null);setView('form');};
+  const openEdit=(r:SaleReturn)=>{setEditing(r);setView('form');};
+  const closeForm=()=>{setView('list');setEditing(null);};
+  const save=(r:SaleReturn,andNew?:boolean)=>{setRecords(prev=>editing?prev.map(x=>x.id===r.id?r:x):[r,...prev]);if(andNew)setEditing(null);else closeForm();};
+  const del=(id:string)=>setRecords(prev=>prev.filter(x=>x.id!==id));
+  if(view==='form')return <SaleReturnForm data={c.data} initial={editing} nextNo={nextNo()} nowTime={nowTime()} onSave={save} onClose={closeForm} onDelete={editing?()=>{del(editing.id);closeForm();}:undefined}/>;
+  const filtered=records.filter(r=>r.date>=dateRange.from&&r.date<=dateRange.to);
+  const filterBar=(
+    <div style={{background:'#fff',borderBottom:'1px solid #e8e8e8',padding:'10px 20px',display:'flex',alignItems:'center',gap:12,flexWrap:'wrap'}}>
+      <select style={{border:'1px solid #ddd',borderRadius:6,padding:'6px 12px',fontSize:13,color:'#333',background:'#fafafa',outline:'none',cursor:'pointer'}}>
+        <option>This Month</option><option>Last Month</option><option>This Quarter</option><option>Custom</option>
+      </select>
+      <div style={{display:'flex',alignItems:'center',gap:8,fontSize:13,color:'#444'}}>
+        <CalendarDays size={16} style={{color:'#1976d2'}}/>
+        <input type="date" value={dateRange.from} onChange={e=>setDateRange(p=>({...p,from:e.target.value}))} style={{border:'none',background:'transparent',fontSize:13,color:'#333',outline:'none',cursor:'pointer'}}/>
+        <span style={{fontWeight:600,color:'#666'}}>TO</span>
+        <input type="date" value={dateRange.to} onChange={e=>setDateRange(p=>({...p,to:e.target.value}))} style={{border:'none',background:'transparent',fontSize:13,color:'#333',outline:'none',cursor:'pointer'}}/>
+      </div>
+    </div>
+  );
+  if(!records.length) return (
+    <main className="page">
+      {filterBar}
+      <div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',minHeight:'60vh',textAlign:'center',gap:14,background:'#eef4fb'}}>
+        <svg width="110" height="110" viewBox="0 0 110 110" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect x="20" y="18" width="62" height="76" rx="6" fill="#dce8f5" transform="rotate(-6 20 18)"/>
+          <line x1="32" y1="40" x2="68" y2="37" stroke="#b8d0ea" strokeWidth="3" strokeLinecap="round"/>
+          <line x1="32" y1="50" x2="72" y2="47" stroke="#b8d0ea" strokeWidth="3" strokeLinecap="round"/>
+          <line x1="32" y1="60" x2="60" y2="57" stroke="#b8d0ea" strokeWidth="3" strokeLinecap="round"/>
+          <rect x="24" y="22" width="62" height="76" rx="6" fill="#f0f6ff" stroke="#c8ddf0" strokeWidth="1"/>
+          <line x1="36" y1="40" x2="74" y2="40" stroke="#b8d0ea" strokeWidth="3" strokeLinecap="round"/>
+          <line x1="36" y1="51" x2="74" y2="51" stroke="#b8d0ea" strokeWidth="3" strokeLinecap="round"/>
+          <line x1="36" y1="62" x2="60" y2="62" stroke="#b8d0ea" strokeWidth="3" strokeLinecap="round"/>
+          <rect x="55" y="84" width="22" height="6" rx="3" fill="#1976d2"/>
+        </svg>
+        <h2 style={{fontFamily:'var(--app-font-serif)',fontSize:20,fontWeight:700,color:'#1a1a1a',margin:0}}>No Data Available</h2>
+        <p style={{fontSize:13,color:'#6d7d6e',maxWidth:320,margin:0,lineHeight:1.6}}>No sale returns recorded yet. Click below to create a credit note.</p>
+        <button className="btn primary" onClick={openNew} style={{marginTop:8,display:'flex',alignItems:'center',gap:7,fontSize:14}}>
+          <Plus size={15}/> Add Sale Return
+        </button>
+      </div>
+    </main>
+  );
+  return (
+    <main className="page">
+      {filterBar}
+      <div style={{padding:'14px 20px 0',display:'flex',justifyContent:'flex-end'}}>
+        <button className="btn primary" onClick={openNew} style={{display:'flex',alignItems:'center',gap:7}}><Plus size={14}/> Add Sale Return</button>
+      </div>
+      <div className="stat-grid" style={{marginTop:14}}>
+        <Stat label="Total Returns" value={filtered.length} note="In selected period" Icon={RotateCcw}/>
+        <Stat label="Total Amount" value={money(filtered.reduce((s,r)=>s+r.totalAmount,0))} note="Credit issued" Icon={FileText} tint="red"/>
+      </div>
+      <section className="panel">
+        <div className="table-wrap"><table className="data-table">
+          <thead><tr><th>Return No.</th><th>Customer</th><th>Date</th><th>Invoice No.</th><th>Items</th><th>Total Amount</th><th></th></tr></thead>
+          <tbody>{filtered.map(r=>(
+            <tr key={r.id}>
+              <td><div className="book-title">#{r.returnNo}</div><div className="muted">{r.time}</div></td>
+              <td><div className="book-title">{r.customerName||'—'}</div><div className="muted">{r.phone}</div></td>
+              <td>{r.date}</td>
+              <td>{r.invoiceNo||'—'}</td>
+              <td>{r.items.length} item{r.items.length!==1?'s':''}</td>
+              <td style={{color:'#a24840',fontWeight:600}}>{money(r.totalAmount)}</td>
+              <td><div className="row-actions"><button className="icon-button" title="Edit" onClick={()=>openEdit(r)}><Pencil/></button><button className="icon-button" title="Delete" onClick={()=>del(r.id)}><Trash2/></button></div></td>
+            </tr>
+          ))}</tbody>
+        </table></div>
+      </section>
+    </main>
+  );
+}
+function SaleReturnForm({data,initial,nextNo,nowTime,onSave,onClose,onDelete}:{data:Dataset;initial:SaleReturn|null;nextNo:string;nowTime:string;onSave:(r:SaleReturn,andNew?:boolean)=>void;onClose:()=>void;onDelete?:()=>void}){
+  const blank:Omit<SaleReturn,'id'>={returnNo:nextNo,date:today,time:nowTime,customerName:'',phone:'',invoiceDate:'',invoiceNo:'',items:[],totalAmount:0,notes:''};
+  const [f,setF]=useState<Omit<SaleReturn,'id'>>(initial||blank);
+  const [showItems,setShowItems]=useState(false);
+  const [selBook,setSelBook]=useState('');
+  const [selQty,setSelQty]=useState(1);
+  const [validationMsg,setValidationMsg]=useState('');
+  const set=(k:string,v:any)=>setF(p=>({...p,[k]:v}));
+  useEffect(()=>{if(!validationMsg)return;const t=setTimeout(()=>setValidationMsg(''),2800);return()=>clearTimeout(t);},[validationMsg]);
+  const addItem=()=>{const book=data.books.find(b=>b.id===selBook);if(!book)return;const newItem={id:idFor('RTI'),bookId:book.id,name:book.title,qty:selQty,price:book.price};setF(p=>({...p,items:[...p.items,newItem],totalAmount:p.totalAmount+selQty*book.price}));setSelBook('');setSelQty(1);setShowItems(false);};
+  const removeItem=(id:string)=>{const item=f.items.find(i=>i.id===id);setF(p=>({...p,items:p.items.filter(i=>i.id!==id),totalAmount:Math.max(0,p.totalAmount-(item?item.qty*item.price:0))}));};
+  const handleSave=(andNew=false)=>{if(!f.totalAmount||f.totalAmount<=0){setValidationMsg("Total amount can't be empty");return;}const rec:SaleReturn={...f,id:initial?.id||idFor('RTN')};onSave(rec,andNew);if(andNew)setF({...blank,returnNo:String(Number(f.returnNo)+1)});};
+  return(
+    <main style={{minHeight:'100vh',background:'#f5f5f5',display:'flex',flexDirection:'column',maxWidth:520,margin:'0 auto',position:'relative',paddingBottom:80}}>
+      <div style={{background:'#fff',borderBottom:'1px solid #e8e8e8',padding:'14px 16px',display:'flex',alignItems:'center',justifyContent:'space-between',position:'sticky',top:0,zIndex:10}}>
+        <div style={{display:'flex',alignItems:'center',gap:12}}>
+          <button onClick={onClose} style={{background:'none',border:'none',cursor:'pointer',padding:4,display:'flex',alignItems:'center',color:'#333'}}><ArrowRight style={{transform:'rotate(180deg)'}} size={22}/></button>
+          <h1 style={{fontSize:18,fontWeight:700,color:'#1a1a1a',margin:0}}>Credit Note</h1>
+        </div>
+        {onDelete&&<button onClick={onDelete} style={{background:'none',border:'none',cursor:'pointer',color:'#e53935',display:'flex',alignItems:'center',gap:4}}><Trash2 size={15}/></button>}
+      </div>
+      <div style={{background:'#fff',borderBottom:'1px solid #eee',padding:'12px 16px',display:'grid',gridTemplateColumns:'1fr 1px 1fr',gap:0}}>
+        <div style={{paddingRight:16}}>
+          <div style={{fontSize:11,color:'#999',marginBottom:3}}>Return No.</div>
+          <div style={{display:'flex',alignItems:'center',gap:6}}>
+            <input value={f.returnNo} onChange={e=>set('returnNo',e.target.value)} style={{border:'none',background:'transparent',fontSize:15,fontWeight:600,color:'#1a1a1a',width:'60px',outline:'none',padding:0}}/>
+            <ChevronDown size={14} style={{color:'#999'}}/>
+          </div>
+        </div>
+        <div style={{background:'#e0e0e0',width:1,margin:'4px 0'}}/>
+        <div style={{paddingLeft:16}}>
+          <div style={{fontSize:11,color:'#999',marginBottom:3}}>Date</div>
+          <div style={{display:'flex',alignItems:'center',gap:6}}>
+            <input type="date" value={f.date} onChange={e=>set('date',e.target.value)} style={{border:'none',background:'transparent',fontSize:14,fontWeight:500,color:'#1a1a1a',outline:'none',padding:0,width:130}}/>
+            <ChevronDown size={14} style={{color:'#999'}}/>
+          </div>
+        </div>
+      </div>
+      <div style={{background:'#fff',marginTop:8,padding:'4px 16px 4px'}}>
+        <div style={{position:'relative',border:'2px solid #1976d2',borderRadius:6,padding:'16px 12px 8px'}}>
+          <label style={{position:'absolute',top:-10,left:10,background:'#fff',padding:'0 4px',fontSize:12,color:'#1976d2',fontWeight:500}}>Customer Name *</label>
+          <input value={f.customerName} onChange={e=>set('customerName',e.target.value)} style={{border:'none',background:'transparent',fontSize:15,color:'#1a1a1a',width:'100%',outline:'none',padding:0}}/>
+        </div>
+      </div>
+      <div style={{background:'#fff',marginTop:10,padding:'4px 16px 12px'}}>
+        <div style={{border:'1px solid #ccc',borderRadius:6,padding:'14px 12px'}}>
+          <input value={f.phone} onChange={e=>set('phone',e.target.value)} placeholder="Phone Number" style={{border:'none',background:'transparent',fontSize:15,color:'#1a1a1a',width:'100%',outline:'none',padding:0}}/>
+        </div>
+      </div>
+      <div style={{background:'#fff',marginTop:8,padding:'12px 16px',display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
+        <div style={{border:'1px solid #ccc',borderRadius:6,padding:'12px'}}>
+          <div style={{fontSize:11,color:'#aaa',marginBottom:4}}>Invoice Date</div>
+          <input type="date" value={f.invoiceDate} onChange={e=>set('invoiceDate',e.target.value)} style={{border:'none',background:'transparent',fontSize:13,color:'#333',outline:'none',padding:0,width:'100%'}}/>
+        </div>
+        <div style={{border:'1px solid #ccc',borderRadius:6,padding:'12px'}}>
+          <div style={{fontSize:11,color:'#aaa',marginBottom:4}}>Inv No.</div>
+          <input value={f.invoiceNo} onChange={e=>set('invoiceNo',e.target.value)} style={{border:'none',background:'transparent',fontSize:13,color:'#333',width:'100%',outline:'none',padding:0}}/>
+        </div>
+      </div>
+      <div style={{background:'#fff',marginTop:8,padding:'0 16px 8px'}}>
+        <button onClick={()=>setShowItems(v=>!v)} style={{width:'100%',display:'flex',alignItems:'center',justifyContent:'center',gap:8,padding:'14px',border:'1px solid #1976d2',borderRadius:6,background:'#fff',color:'#1976d2',fontSize:14,fontWeight:600,cursor:'pointer'}}>
+          <span style={{width:22,height:22,borderRadius:'50%',background:'#1976d2',color:'#fff',display:'flex',alignItems:'center',justifyContent:'center',fontSize:16,fontWeight:900,lineHeight:'1'}}>+</span>
+          Add Items <span style={{fontWeight:400,color:'#999'}}>(Optional)</span>
+        </button>
+        {showItems&&(
+          <div style={{marginTop:10,border:'1px solid #e0e0e0',borderRadius:6,padding:'12px'}}>
+            <div style={{display:'grid',gridTemplateColumns:'2fr 1fr auto',gap:8,alignItems:'flex-end',marginBottom:8}}>
+              <div><div style={{fontSize:11,color:'#888',marginBottom:4}}>Book</div>
+                <select value={selBook} onChange={e=>setSelBook(e.target.value)} style={{width:'100%',border:'1px solid #ddd',borderRadius:5,padding:'8px',fontSize:13,outline:'none'}}>
+                  <option value="">Select book…</option>{data.books.map(b=><option key={b.id} value={b.id}>{b.title}</option>)}
+                </select>
+              </div>
+              <div><div style={{fontSize:11,color:'#888',marginBottom:4}}>Qty</div>
+                <input type="number" min="1" value={selQty} onChange={e=>setSelQty(Number(e.target.value))} style={{width:'100%',border:'1px solid #ddd',borderRadius:5,padding:'8px',fontSize:13,outline:'none'}}/>
+              </div>
+              <button onClick={addItem} className="btn primary" style={{padding:'8px 12px',height:36}}><Plus size={13}/></button>
+            </div>
+            {f.items.map(item=>(
+              <div key={item.id} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'8px 0',borderTop:'1px solid #f0f0f0'}}>
+                <div><div style={{fontSize:13,fontWeight:600,color:'#1a1a1a'}}>{item.name}</div><div style={{fontSize:11,color:'#888'}}>{item.qty} × {money(item.price)}</div></div>
+                <div style={{display:'flex',alignItems:'center',gap:8}}><span style={{fontWeight:600,color:'#a24840'}}>{money(item.qty*item.price)}</span><button onClick={()=>removeItem(item.id)} style={{background:'none',border:'none',cursor:'pointer',color:'#ccc',display:'flex'}}><Trash2 size={14}/></button></div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+      <div style={{background:'#fff',marginTop:8,padding:'0 16px'}}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'18px 0'}}>
+          <span style={{fontSize:15,fontWeight:700,color:'#1a1a1a'}}>Total Amount</span>
+          <div style={{display:'flex',alignItems:'center',gap:4}}>
+            <span style={{fontSize:15,color:'#1a1a1a'}}>₹</span>
+            <div style={{borderBottom:'1px dashed #aaa',minWidth:140,paddingBottom:2}}>
+              <input type="number" min="0" value={f.totalAmount||''} onChange={e=>set('totalAmount',Number(e.target.value))} style={{border:'none',background:'transparent',fontSize:15,fontWeight:600,color:'#1a1a1a',width:'100%',outline:'none',padding:0,textAlign:'right'}}/>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div style={{background:'#fff',marginTop:8,padding:'12px 16px'}}>
+        <label style={{fontSize:12,color:'#888',display:'block',marginBottom:6}}>Notes (Optional)</label>
+        <textarea value={f.notes} onChange={e=>set('notes',e.target.value)} placeholder="Add a note…" style={{width:'100%',border:'1px solid #ddd',borderRadius:6,padding:'10px',fontSize:14,background:'#fafafa',resize:'vertical',height:72,outline:'none',boxSizing:'border-box'}}/>
+      </div>
+      {validationMsg&&(
+        <div style={{position:'fixed',bottom:90,left:'50%',transform:'translateX(-50%)',background:'rgba(40,40,40,0.92)',color:'#fff',borderRadius:28,padding:'12px 20px',display:'flex',alignItems:'center',gap:10,fontSize:14,fontWeight:500,zIndex:999,boxShadow:'0 4px 20px rgba(0,0,0,0.25)',whiteSpace:'nowrap'}}>
+          <span style={{width:22,height:22,background:'#e53935',borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center',fontSize:13,flexShrink:0}}>!</span>
+          {validationMsg}
+        </div>
+      )}
+      <div style={{position:'fixed',bottom:0,left:'50%',transform:'translateX(-50%)',width:'100%',maxWidth:520,background:'#fff',borderTop:'1px solid #e8e8e8',display:'grid',gridTemplateColumns:'1fr 1fr auto',zIndex:10}}>
+        <button onClick={()=>handleSave(true)} style={{padding:'16px 0',background:'#fff',border:'none',borderRight:'1px solid #e8e8e8',fontSize:14,fontWeight:600,color:'#555',cursor:'pointer'}} onMouseEnter={e=>(e.currentTarget as HTMLButtonElement).style.background='#f5f5f5'} onMouseLeave={e=>(e.currentTarget as HTMLButtonElement).style.background='#fff'}>Save &amp; New</button>
+        <button onClick={()=>handleSave(false)} style={{padding:'16px 0',background:'#1565c0',border:'none',fontSize:14,fontWeight:700,color:'#fff',cursor:'pointer'}} onMouseEnter={e=>(e.currentTarget as HTMLButtonElement).style.background='#0d47a1'} onMouseLeave={e=>(e.currentTarget as HTMLButtonElement).style.background='#1565c0'}>Save</button>
+        <button style={{padding:'16px 18px',background:'#fff',border:'none',borderLeft:'1px solid #e8e8e8',fontSize:20,color:'#555',cursor:'pointer',lineHeight:1}} title="More options">⋮</button>
+      </div>
+    </main>
+  );
+}
+
+// ─────────────────────────── Estimate / Quotation ───────────────────────────
+const ESTIMATE_KEY='bookbazaar-estimate-v1';
+type EstimateItem={id:string;bookId:string;name:string;qty:number;price:number;discount:number};
+type Estimate={id:string;estimateNo:string;date:string;expiryDate:string;time:string;customerName:string;phone:string;items:EstimateItem[];subTotal:number;discountAmt:number;totalAmount:number;notes:string;status:'Draft'|'Sent'|'Accepted'|'Expired'};
+function EstimatePage(c:Context){
+  const [records,setRecords]=useState<Estimate[]>(()=>{try{const v=localStorage.getItem(ESTIMATE_KEY);return v?JSON.parse(v):[];}catch{return [];}});
+  const [view,setView]=useState<'list'|'form'>('list');
+  const [editing,setEditing]=useState<Estimate|null>(null);
+  const [dateRange,setDateRange]=useState({from:today.slice(0,8)+'01',to:today});
+  useEffect(()=>{localStorage.setItem(ESTIMATE_KEY,JSON.stringify(records));},[records]);
+  const nowTime=()=>new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',hour12:true});
+  const nextNo=()=>`EST-${String(records.length+1).padStart(3,'0')}`;
+  const openNew=()=>{setEditing(null);setView('form');};
+  const openEdit=(r:Estimate)=>{setEditing(r);setView('form');};
+  const closeForm=()=>{setView('list');setEditing(null);};
+  const save=(r:Estimate,andNew?:boolean)=>{setRecords(prev=>editing?prev.map(x=>x.id===r.id?r:x):[r,...prev]);if(andNew)setEditing(null);else closeForm();};
+  const del=(id:string)=>setRecords(prev=>prev.filter(x=>x.id!==id));
+  if(view==='form')return <EstimateForm data={c.data} initial={editing} nextNo={nextNo()} nowTime={nowTime()} onSave={save} onClose={closeForm} onDelete={editing?()=>{del(editing.id);closeForm();}:undefined}/>;
+  const filtered=records.filter(r=>r.date>=dateRange.from&&r.date<=dateRange.to);
+  const filterBar=(
+    <div style={{background:'#fff',borderBottom:'1px solid #e8e8e8',padding:'10px 20px',display:'flex',alignItems:'center',gap:12,flexWrap:'wrap'}}>
+      <select style={{border:'1px solid #ddd',borderRadius:6,padding:'6px 12px',fontSize:13,color:'#333',background:'#fafafa',outline:'none',cursor:'pointer'}}>
+        <option>This Month</option><option>Last Month</option><option>This Quarter</option><option>Custom</option>
+      </select>
+      <div style={{display:'flex',alignItems:'center',gap:8,fontSize:13,color:'#444'}}>
+        <CalendarDays size={16} style={{color:'#1976d2'}}/>
+        <input type="date" value={dateRange.from} onChange={e=>setDateRange(p=>({...p,from:e.target.value}))} style={{border:'none',background:'transparent',fontSize:13,color:'#333',outline:'none',cursor:'pointer'}}/>
+        <span style={{fontWeight:600,color:'#666'}}>TO</span>
+        <input type="date" value={dateRange.to} onChange={e=>setDateRange(p=>({...p,to:e.target.value}))} style={{border:'none',background:'transparent',fontSize:13,color:'#333',outline:'none',cursor:'pointer'}}/>
+      </div>
+    </div>
+  );
+  if(!records.length) return (
+    <main className="page">
+      {filterBar}
+      <div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',minHeight:'60vh',textAlign:'center',gap:14,background:'#eef4fb'}}>
+        <svg width="110" height="110" viewBox="0 0 110 110" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect x="18" y="20" width="64" height="78" rx="7" fill="#e3eefa" transform="rotate(-5 18 20)"/>
+          <rect x="26" y="16" width="64" height="78" rx="7" fill="#f4f8ff" stroke="#c5d9f0" strokeWidth="1"/>
+          <line x1="38" y1="36" x2="76" y2="36" stroke="#c5d9f0" strokeWidth="3" strokeLinecap="round"/>
+          <line x1="38" y1="47" x2="76" y2="47" stroke="#c5d9f0" strokeWidth="3" strokeLinecap="round"/>
+          <line x1="38" y1="58" x2="62" y2="58" stroke="#c5d9f0" strokeWidth="3" strokeLinecap="round"/>
+          <line x1="38" y1="69" x2="70" y2="69" stroke="#e0b040" strokeWidth="3" strokeLinecap="round"/>
+          <circle cx="78" cy="78" r="14" fill="#1976d2"/>
+          <line x1="78" y1="73" x2="78" y2="83" stroke="#fff" strokeWidth="2.5" strokeLinecap="round"/>
+          <line x1="73" y1="78" x2="83" y2="78" stroke="#fff" strokeWidth="2.5" strokeLinecap="round"/>
+        </svg>
+        <h2 style={{fontFamily:'var(--app-font-serif)',fontSize:20,fontWeight:700,color:'#1a1a1a',margin:0}}>No Estimates Yet</h2>
+        <p style={{fontSize:13,color:'#6d7d6e',maxWidth:320,margin:0,lineHeight:1.6}}>Create estimates and quotations to share with your customers before finalising a sale.</p>
+        <button className="btn primary" onClick={openNew} style={{marginTop:8,display:'flex',alignItems:'center',gap:7,fontSize:14}}>
+          <Plus size={15}/> Add Estimate
+        </button>
+      </div>
+    </main>
+  );
+  const statusColor=(s:string)=>s==='Accepted'?'#2e7d32':s==='Sent'?'#1565c0':s==='Expired'?'#a24840':'#888';
+  return (
+    <main className="page">
+      {filterBar}
+      <div style={{padding:'14px 20px 0',display:'flex',justifyContent:'flex-end'}}>
+        <button className="btn primary" onClick={openNew} style={{display:'flex',alignItems:'center',gap:7}}><Plus size={14}/> Add Estimate</button>
+      </div>
+      <div className="stat-grid" style={{marginTop:14}}>
+        <Stat label="Total Estimates" value={filtered.length} note="In selected period" Icon={ClipboardList}/>
+        <Stat label="Total Value" value={money(filtered.reduce((s,r)=>s+r.totalAmount,0))} note="Quoted amount" Icon={FileText}/>
+        <Stat label="Accepted" value={filtered.filter(r=>r.status==='Accepted').length} note="Converted to sale" Icon={Check} tint="green"/>
+      </div>
+      <section className="panel">
+        <div className="table-wrap"><table className="data-table">
+          <thead><tr><th>Estimate No.</th><th>Customer</th><th>Date</th><th>Expiry</th><th>Items</th><th>Total</th><th>Status</th><th></th></tr></thead>
+          <tbody>{filtered.map(r=>(
+            <tr key={r.id}>
+              <td><div className="book-title">{r.estimateNo}</div><div className="muted">{r.time}</div></td>
+              <td><div className="book-title">{r.customerName||'—'}</div><div className="muted">{r.phone}</div></td>
+              <td>{r.date}</td>
+              <td>{r.expiryDate||'—'}</td>
+              <td>{r.items.length} item{r.items.length!==1?'s':''}</td>
+              <td style={{fontWeight:600}}>{money(r.totalAmount)}</td>
+              <td><span style={{fontSize:12,fontWeight:600,color:statusColor(r.status)}}>{r.status}</span></td>
+              <td><div className="row-actions"><button className="icon-button" title="Edit" onClick={()=>openEdit(r)}><Pencil/></button><button className="icon-button" title="Delete" onClick={()=>del(r.id)}><Trash2/></button></div></td>
+            </tr>
+          ))}</tbody>
+        </table></div>
+      </section>
+    </main>
+  );
+}
+function EstimateForm({data,initial,nextNo,nowTime,onSave,onClose,onDelete}:{data:Dataset;initial:Estimate|null;nextNo:string;nowTime:string;onSave:(r:Estimate,andNew?:boolean)=>void;onClose:()=>void;onDelete?:()=>void}){
+  const blank:Omit<Estimate,'id'>={estimateNo:nextNo,date:today,expiryDate:'',time:nowTime,customerName:'',phone:'',items:[],subTotal:0,discountAmt:0,totalAmount:0,notes:'',status:'Draft'};
+  const [f,setF]=useState<Omit<Estimate,'id'>>(initial||blank);
+  const [showItems,setShowItems]=useState(false);
+  const [selBook,setSelBook]=useState('');
+  const [selQty,setSelQty]=useState(1);
+  const [selDisc,setSelDisc]=useState(0);
+  const [validationMsg,setValidationMsg]=useState('');
+  const set=(k:string,v:any)=>setF(p=>({...p,[k]:v}));
+  useEffect(()=>{if(!validationMsg)return;const t=setTimeout(()=>setValidationMsg(''),2800);return()=>clearTimeout(t);},[validationMsg]);
+  const recalc=(items:EstimateItem[])=>{const sub=items.reduce((s,i)=>s+i.qty*i.price,0);const disc=items.reduce((s,i)=>s+i.qty*i.price*(i.discount/100),0);return{subTotal:sub,discountAmt:disc,totalAmount:sub-disc};};
+  const addItem=()=>{const book=data.books.find(b=>b.id===selBook);if(!book)return;const newItem={id:idFor('EI'),bookId:book.id,name:book.title,qty:selQty,price:book.price,discount:selDisc};const items=[...f.items,newItem];setF(p=>({...p,items,...recalc(items)}));setSelBook('');setSelQty(1);setSelDisc(0);setShowItems(false);};
+  const removeItem=(id:string)=>{const items=f.items.filter(i=>i.id!==id);setF(p=>({...p,items,...recalc(items)}));};
+  const handleSave=(andNew=false)=>{if(!f.customerName.trim()){setValidationMsg('Customer name is required');return;}if(!f.items.length&&!f.totalAmount){setValidationMsg("Add at least one item or enter a total");return;}const rec:Estimate={...f,id:initial?.id||idFor('EST')};onSave(rec,andNew);if(andNew)setF({...blank,estimateNo:`EST-${String(Number(f.estimateNo.replace('EST-',''))+1).padStart(3,'0')}`});};
+  return(
+    <main style={{minHeight:'100vh',background:'#f5f5f5',display:'flex',flexDirection:'column',maxWidth:520,margin:'0 auto',position:'relative',paddingBottom:80}}>
+      {/* Header */}
+      <div style={{background:'#fff',borderBottom:'1px solid #e8e8e8',padding:'14px 16px',display:'flex',alignItems:'center',justifyContent:'space-between',position:'sticky',top:0,zIndex:10}}>
+        <div style={{display:'flex',alignItems:'center',gap:12}}>
+          <button onClick={onClose} style={{background:'none',border:'none',cursor:'pointer',padding:4,display:'flex',alignItems:'center',color:'#333'}}><ArrowRight style={{transform:'rotate(180deg)'}} size={22}/></button>
+          <h1 style={{fontSize:18,fontWeight:700,color:'#1a1a1a',margin:0}}>Estimate / Quotation</h1>
+        </div>
+        {onDelete&&<button onClick={onDelete} style={{background:'none',border:'none',cursor:'pointer',color:'#e53935',display:'flex'}}><Trash2 size={15}/></button>}
+      </div>
+      {/* Estimate No + Date */}
+      <div style={{background:'#fff',borderBottom:'1px solid #eee',padding:'12px 16px',display:'grid',gridTemplateColumns:'1fr 1px 1fr',gap:0}}>
+        <div style={{paddingRight:16}}>
+          <div style={{fontSize:11,color:'#999',marginBottom:3}}>Estimate No.</div>
+          <div style={{display:'flex',alignItems:'center',gap:6}}>
+            <input value={f.estimateNo} onChange={e=>set('estimateNo',e.target.value)} style={{border:'none',background:'transparent',fontSize:15,fontWeight:600,color:'#1a1a1a',width:'90px',outline:'none',padding:0}}/>
+            <ChevronDown size={14} style={{color:'#999'}}/>
+          </div>
+        </div>
+        <div style={{background:'#e0e0e0',width:1,margin:'4px 0'}}/>
+        <div style={{paddingLeft:16}}>
+          <div style={{fontSize:11,color:'#999',marginBottom:3}}>Date</div>
+          <input type="date" value={f.date} onChange={e=>set('date',e.target.value)} style={{border:'none',background:'transparent',fontSize:14,fontWeight:500,color:'#1a1a1a',outline:'none',padding:0,width:130}}/>
+        </div>
+      </div>
+      {/* Customer Name */}
+      <div style={{background:'#fff',marginTop:8,padding:'4px 16px 4px'}}>
+        <div style={{position:'relative',border:'2px solid #1976d2',borderRadius:6,padding:'16px 12px 8px'}}>
+          <label style={{position:'absolute',top:-10,left:10,background:'#fff',padding:'0 4px',fontSize:12,color:'#1976d2',fontWeight:500}}>Customer Name *</label>
+          <input value={f.customerName} onChange={e=>set('customerName',e.target.value)} style={{border:'none',background:'transparent',fontSize:15,color:'#1a1a1a',width:'100%',outline:'none',padding:0}}/>
+        </div>
+      </div>
+      {/* Phone */}
+      <div style={{background:'#fff',marginTop:10,padding:'4px 16px 12px'}}>
+        <div style={{border:'1px solid #ccc',borderRadius:6,padding:'14px 12px'}}>
+          <input value={f.phone} onChange={e=>set('phone',e.target.value)} placeholder="Phone Number" style={{border:'none',background:'transparent',fontSize:15,color:'#1a1a1a',width:'100%',outline:'none',padding:0}}/>
+        </div>
+      </div>
+      {/* Expiry + Status */}
+      <div style={{background:'#fff',marginTop:8,padding:'12px 16px',display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
+        <div style={{border:'1px solid #ccc',borderRadius:6,padding:'12px'}}>
+          <div style={{fontSize:11,color:'#aaa',marginBottom:4}}>Expiry Date</div>
+          <input type="date" value={f.expiryDate} onChange={e=>set('expiryDate',e.target.value)} style={{border:'none',background:'transparent',fontSize:13,color:'#333',outline:'none',padding:0,width:'100%'}}/>
+        </div>
+        <div style={{border:'1px solid #ccc',borderRadius:6,padding:'12px'}}>
+          <div style={{fontSize:11,color:'#aaa',marginBottom:4}}>Status</div>
+          <select value={f.status} onChange={e=>set('status',e.target.value as Estimate['status'])} style={{border:'none',background:'transparent',fontSize:13,color:'#333',width:'100%',outline:'none',padding:0}}>
+            <option>Draft</option><option>Sent</option><option>Accepted</option><option>Expired</option>
+          </select>
+        </div>
+      </div>
+      {/* Add Items */}
+      <div style={{background:'#fff',marginTop:8,padding:'0 16px 8px'}}>
+        <button onClick={()=>setShowItems(v=>!v)} style={{width:'100%',display:'flex',alignItems:'center',justifyContent:'center',gap:8,padding:'14px',border:'1px solid #1976d2',borderRadius:6,background:'#fff',color:'#1976d2',fontSize:14,fontWeight:600,cursor:'pointer'}}>
+          <span style={{width:22,height:22,borderRadius:'50%',background:'#1976d2',color:'#fff',display:'flex',alignItems:'center',justifyContent:'center',fontSize:16,fontWeight:900,lineHeight:'1'}}>+</span>
+          Add Items <span style={{fontWeight:400,color:'#999'}}>(Optional)</span>
+        </button>
+        {showItems&&(
+          <div style={{marginTop:10,border:'1px solid #e0e0e0',borderRadius:6,padding:'12px'}}>
+            <div style={{display:'grid',gridTemplateColumns:'2fr 1fr 1fr auto',gap:8,alignItems:'flex-end',marginBottom:8}}>
+              <div><div style={{fontSize:11,color:'#888',marginBottom:4}}>Book</div>
+                <select value={selBook} onChange={e=>setSelBook(e.target.value)} style={{width:'100%',border:'1px solid #ddd',borderRadius:5,padding:'7px',fontSize:13,outline:'none'}}>
+                  <option value="">Select…</option>{data.books.map(b=><option key={b.id} value={b.id}>{b.title}</option>)}
+                </select>
+              </div>
+              <div><div style={{fontSize:11,color:'#888',marginBottom:4}}>Qty</div>
+                <input type="number" min="1" value={selQty} onChange={e=>setSelQty(Number(e.target.value))} style={{width:'100%',border:'1px solid #ddd',borderRadius:5,padding:'7px',fontSize:13,outline:'none'}}/>
+              </div>
+              <div><div style={{fontSize:11,color:'#888',marginBottom:4}}>Disc %</div>
+                <input type="number" min="0" max="100" value={selDisc} onChange={e=>setSelDisc(Number(e.target.value))} style={{width:'100%',border:'1px solid #ddd',borderRadius:5,padding:'7px',fontSize:13,outline:'none'}}/>
+              </div>
+              <button onClick={addItem} className="btn primary" style={{padding:'7px 10px',height:34,alignSelf:'flex-end'}}><Plus size={13}/></button>
+            </div>
+            {f.items.map(item=>(
+              <div key={item.id} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'8px 0',borderTop:'1px solid #f0f0f0'}}>
+                <div><div style={{fontSize:13,fontWeight:600,color:'#1a1a1a'}}>{item.name}</div><div style={{fontSize:11,color:'#888'}}>{item.qty} × {money(item.price)}{item.discount>0?` − ${item.discount}%`:''}</div></div>
+                <div style={{display:'flex',alignItems:'center',gap:8}}><span style={{fontWeight:600}}>{money(item.qty*item.price*(1-item.discount/100))}</span><button onClick={()=>removeItem(item.id)} style={{background:'none',border:'none',cursor:'pointer',color:'#ccc',display:'flex'}}><Trash2 size={14}/></button></div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+      {/* Totals */}
+      <div style={{background:'#fff',marginTop:8,padding:'0 16px'}}>
+        {f.items.length>0&&<>
+          <div style={{display:'flex',justifyContent:'space-between',padding:'12px 0',borderBottom:'1px dashed #eee',fontSize:14,color:'#555'}}>
+            <span>Sub Total</span><span>{money(f.subTotal)}</span>
+          </div>
+          {f.discountAmt>0&&<div style={{display:'flex',justifyContent:'space-between',padding:'10px 0',borderBottom:'1px dashed #eee',fontSize:14,color:'#a24840'}}>
+            <span>Discount</span><span>− {money(f.discountAmt)}</span>
+          </div>}
+        </>}
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'16px 0'}}>
+          <span style={{fontSize:15,fontWeight:700,color:'#1a1a1a'}}>Total Amount</span>
+          <div style={{display:'flex',alignItems:'center',gap:4}}>
+            <span style={{fontSize:15,color:'#1a1a1a'}}>₹</span>
+            <div style={{borderBottom:'1px dashed #aaa',minWidth:140,paddingBottom:2}}>
+              <input type="number" min="0" value={f.totalAmount||''} onChange={e=>set('totalAmount',Number(e.target.value))} style={{border:'none',background:'transparent',fontSize:15,fontWeight:600,color:'#1a1a1a',width:'100%',outline:'none',padding:0,textAlign:'right'}}/>
+            </div>
+          </div>
+        </div>
+      </div>
+      {/* Notes */}
+      <div style={{background:'#fff',marginTop:8,padding:'12px 16px'}}>
+        <label style={{fontSize:12,color:'#888',display:'block',marginBottom:6}}>Notes (Optional)</label>
+        <textarea value={f.notes} onChange={e=>set('notes',e.target.value)} placeholder="Add terms, conditions or a note…" style={{width:'100%',border:'1px solid #ddd',borderRadius:6,padding:'10px',fontSize:14,background:'#fafafa',resize:'vertical',height:72,outline:'none',boxSizing:'border-box'}}/>
+      </div>
+      {validationMsg&&(
+        <div style={{position:'fixed',bottom:90,left:'50%',transform:'translateX(-50%)',background:'rgba(40,40,40,0.92)',color:'#fff',borderRadius:28,padding:'12px 20px',display:'flex',alignItems:'center',gap:10,fontSize:14,fontWeight:500,zIndex:999,boxShadow:'0 4px 20px rgba(0,0,0,0.25)',whiteSpace:'nowrap'}}>
+          <span style={{width:22,height:22,background:'#e53935',borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center',fontSize:13,flexShrink:0}}>!</span>
+          {validationMsg}
+        </div>
+      )}
+      <div style={{position:'fixed',bottom:0,left:'50%',transform:'translateX(-50%)',width:'100%',maxWidth:520,background:'#fff',borderTop:'1px solid #e8e8e8',display:'grid',gridTemplateColumns:'1fr 1fr auto',zIndex:10}}>
+        <button onClick={()=>handleSave(true)} style={{padding:'16px 0',background:'#fff',border:'none',borderRight:'1px solid #e8e8e8',fontSize:14,fontWeight:600,color:'#555',cursor:'pointer'}} onMouseEnter={e=>(e.currentTarget as HTMLButtonElement).style.background='#f5f5f5'} onMouseLeave={e=>(e.currentTarget as HTMLButtonElement).style.background='#fff'}>Save &amp; New</button>
+        <button onClick={()=>handleSave(false)} style={{padding:'16px 0',background:'#1565c0',border:'none',fontSize:14,fontWeight:700,color:'#fff',cursor:'pointer'}} onMouseEnter={e=>(e.currentTarget as HTMLButtonElement).style.background='#0d47a1'} onMouseLeave={e=>(e.currentTarget as HTMLButtonElement).style.background='#1565c0'}>Save</button>
+        <button style={{padding:'16px 18px',background:'#fff',border:'none',borderLeft:'1px solid #e8e8e8',fontSize:20,color:'#555',cursor:'pointer',lineHeight:1}} title="More options">⋮</button>
+      </div>
+    </main>
+  );
+}
+
+// ─────────────────────────── Delivery Challan ───────────────────────────
+const CHALLAN_KEY='bookbazaar-challan-v1';
+type ChallanItem={id:string;bookId:string;name:string;qty:number;price:number};
+type DeliveryChallan={id:string;challanNo:string;date:string;time:string;customerName:string;phone:string;deliveryAddress:string;vehicleNo:string;items:ChallanItem[];totalAmount:number;notes:string;status:'Draft'|'Dispatched'|'Delivered'};
+function DeliveryChallanPage(c:Context){
+  const [records,setRecords]=useState<DeliveryChallan[]>(()=>{try{const v=localStorage.getItem(CHALLAN_KEY);return v?JSON.parse(v):[];}catch{return [];}});
+  const [view,setView]=useState<'list'|'form'>('list');
+  const [editing,setEditing]=useState<DeliveryChallan|null>(null);
+  const [dateRange,setDateRange]=useState({from:today.slice(0,8)+'01',to:today});
+  useEffect(()=>{localStorage.setItem(CHALLAN_KEY,JSON.stringify(records));},[records]);
+  const nowTime=()=>new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',hour12:true});
+  const nextNo=()=>`DC-${String(records.length+1).padStart(3,'0')}`;
+  const openNew=()=>{setEditing(null);setView('form');};
+  const openEdit=(r:DeliveryChallan)=>{setEditing(r);setView('form');};
+  const closeForm=()=>{setView('list');setEditing(null);};
+  const save=(r:DeliveryChallan,andNew?:boolean)=>{setRecords(prev=>editing?prev.map(x=>x.id===r.id?r:x):[r,...prev]);if(andNew)setEditing(null);else closeForm();};
+  const del=(id:string)=>setRecords(prev=>prev.filter(x=>x.id!==id));
+  if(view==='form')return <DeliveryChallanForm data={c.data} initial={editing} nextNo={nextNo()} nowTime={nowTime()} onSave={save} onClose={closeForm} onDelete={editing?()=>{del(editing.id);closeForm();}:undefined}/>;
+  const filtered=records.filter(r=>r.date>=dateRange.from&&r.date<=dateRange.to);
+  const filterBar=(
+    <div style={{background:'#fff',borderBottom:'1px solid #e8e8e8',padding:'10px 20px',display:'flex',alignItems:'center',gap:12,flexWrap:'wrap'}}>
+      <select style={{border:'1px solid #ddd',borderRadius:6,padding:'6px 12px',fontSize:13,color:'#333',background:'#fafafa',outline:'none',cursor:'pointer'}}>
+        <option>This Month</option><option>Last Month</option><option>This Quarter</option><option>Custom</option>
+      </select>
+      <div style={{display:'flex',alignItems:'center',gap:8,fontSize:13,color:'#444'}}>
+        <CalendarDays size={16} style={{color:'#1976d2'}}/>
+        <input type="date" value={dateRange.from} onChange={e=>setDateRange(p=>({...p,from:e.target.value}))} style={{border:'none',background:'transparent',fontSize:13,color:'#333',outline:'none',cursor:'pointer'}}/>
+        <span style={{fontWeight:600,color:'#666'}}>TO</span>
+        <input type="date" value={dateRange.to} onChange={e=>setDateRange(p=>({...p,to:e.target.value}))} style={{border:'none',background:'transparent',fontSize:13,color:'#333',outline:'none',cursor:'pointer'}}/>
+      </div>
+    </div>
+  );
+  if(!records.length) return (
+    <main className="page">
+      {filterBar}
+      <div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',minHeight:'60vh',textAlign:'center',gap:14,background:'#eef4fb'}}>
+        <svg width="110" height="110" viewBox="0 0 110 110" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect x="10" y="55" width="90" height="42" rx="6" fill="#dce8f5"/>
+          <rect x="10" y="55" width="90" height="42" rx="6" stroke="#b8d0ea" strokeWidth="1.5"/>
+          <rect x="22" y="38" width="66" height="22" rx="4" fill="#f0f6ff" stroke="#c8ddf0" strokeWidth="1.2"/>
+          <rect x="34" y="24" width="42" height="18" rx="4" fill="#e3eefa" stroke="#b8d0ea" strokeWidth="1.2"/>
+          <circle cx="30" cy="97" r="7" fill="#1976d2"/>
+          <circle cx="80" cy="97" r="7" fill="#1976d2"/>
+          <line x1="22" y1="68" x2="60" y2="68" stroke="#b8d0ea" strokeWidth="2.5" strokeLinecap="round"/>
+          <line x1="22" y1="77" x2="50" y2="77" stroke="#b8d0ea" strokeWidth="2.5" strokeLinecap="round"/>
+        </svg>
+        <h2 style={{fontFamily:'var(--app-font-serif)',fontSize:20,fontWeight:700,color:'#1a1a1a',margin:0}}>No Challans Yet</h2>
+        <p style={{fontSize:13,color:'#6d7d6e',maxWidth:320,margin:0,lineHeight:1.6}}>Generate delivery challans for book dispatches. Track deliveries from dispatch to delivery.</p>
+        <button className="btn primary" onClick={openNew} style={{marginTop:8,display:'flex',alignItems:'center',gap:7,fontSize:14}}>
+          <Plus size={15}/> Add Delivery Challan
+        </button>
+      </div>
+    </main>
+  );
+  const statusColor=(s:string)=>s==='Delivered'?'#2e7d32':s==='Dispatched'?'#1565c0':'#888';
+  return (
+    <main className="page">
+      {filterBar}
+      <div style={{padding:'14px 20px 0',display:'flex',justifyContent:'flex-end'}}>
+        <button className="btn primary" onClick={openNew} style={{display:'flex',alignItems:'center',gap:7}}><Plus size={14}/> Add Delivery Challan</button>
+      </div>
+      <div className="stat-grid" style={{marginTop:14}}>
+        <Stat label="Total Challans" value={filtered.length} note="In selected period" Icon={Package}/>
+        <Stat label="Dispatched" value={filtered.filter(r=>r.status==='Dispatched').length} note="In transit" Icon={ArrowRight}/>
+        <Stat label="Delivered" value={filtered.filter(r=>r.status==='Delivered').length} note="Completed" Icon={Check} tint="green"/>
+      </div>
+      <section className="panel">
+        <div className="table-wrap"><table className="data-table">
+          <thead><tr><th>Challan No.</th><th>Customer</th><th>Date</th><th>Address</th><th>Items</th><th>Amount</th><th>Status</th><th></th></tr></thead>
+          <tbody>{filtered.map(r=>(
+            <tr key={r.id}>
+              <td><div className="book-title">{r.challanNo}</div><div className="muted">{r.time}</div></td>
+              <td><div className="book-title">{r.customerName||'—'}</div><div className="muted">{r.phone}</div></td>
+              <td>{r.date}</td>
+              <td style={{maxWidth:160,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.deliveryAddress||'—'}</td>
+              <td>{r.items.length} item{r.items.length!==1?'s':''}</td>
+              <td style={{fontWeight:600}}>{money(r.totalAmount)}</td>
+              <td><span style={{fontSize:12,fontWeight:600,color:statusColor(r.status)}}>{r.status}</span></td>
+              <td><div className="row-actions"><button className="icon-button" title="Edit" onClick={()=>openEdit(r)}><Pencil/></button><button className="icon-button" title="Delete" onClick={()=>del(r.id)}><Trash2/></button></div></td>
+            </tr>
+          ))}</tbody>
+        </table></div>
+      </section>
+    </main>
+  );
+}
+function DeliveryChallanForm({data,initial,nextNo,nowTime,onSave,onClose,onDelete}:{data:Dataset;initial:DeliveryChallan|null;nextNo:string;nowTime:string;onSave:(r:DeliveryChallan,andNew?:boolean)=>void;onClose:()=>void;onDelete?:()=>void}){
+  const blank:Omit<DeliveryChallan,'id'>={challanNo:nextNo,date:today,time:nowTime,customerName:'',phone:'',deliveryAddress:'',vehicleNo:'',items:[],totalAmount:0,notes:'',status:'Draft'};
+  const [f,setF]=useState<Omit<DeliveryChallan,'id'>>(initial||blank);
+  const [showItems,setShowItems]=useState(false);
+  const [selBook,setSelBook]=useState('');
+  const [selQty,setSelQty]=useState(1);
+  const [validationMsg,setValidationMsg]=useState('');
+  const set=(k:string,v:any)=>setF(p=>({...p,[k]:v}));
+  useEffect(()=>{if(!validationMsg)return;const t=setTimeout(()=>setValidationMsg(''),2800);return()=>clearTimeout(t);},[validationMsg]);
+  const addItem=()=>{const book=data.books.find(b=>b.id===selBook);if(!book)return;const newItem={id:idFor('CI'),bookId:book.id,name:book.title,qty:selQty,price:book.price};setF(p=>({...p,items:[...p.items,newItem],totalAmount:p.totalAmount+selQty*book.price}));setSelBook('');setSelQty(1);setShowItems(false);};
+  const removeItem=(id:string)=>{const item=f.items.find(i=>i.id===id);setF(p=>({...p,items:p.items.filter(i=>i.id!==id),totalAmount:Math.max(0,p.totalAmount-(item?item.qty*item.price:0))}));};
+  const handleSave=(andNew=false)=>{if(!f.customerName.trim()){setValidationMsg('Customer name is required');return;}const rec:DeliveryChallan={...f,id:initial?.id||idFor('DC')};onSave(rec,andNew);if(andNew)setF({...blank,challanNo:`DC-${String(Number(f.challanNo.replace('DC-',''))+1).padStart(3,'0')}`});};
+  return(
+    <main style={{minHeight:'100vh',background:'#f5f5f5',display:'flex',flexDirection:'column',maxWidth:520,margin:'0 auto',position:'relative',paddingBottom:80}}>
+      {/* Header */}
+      <div style={{background:'#fff',borderBottom:'1px solid #e8e8e8',padding:'14px 16px',display:'flex',alignItems:'center',justifyContent:'space-between',position:'sticky',top:0,zIndex:10}}>
+        <div style={{display:'flex',alignItems:'center',gap:12}}>
+          <button onClick={onClose} style={{background:'none',border:'none',cursor:'pointer',padding:4,display:'flex',alignItems:'center',color:'#333'}}><ArrowRight style={{transform:'rotate(180deg)'}} size={22}/></button>
+          <h1 style={{fontSize:18,fontWeight:700,color:'#1a1a1a',margin:0}}>Delivery Challan</h1>
+        </div>
+        {onDelete&&<button onClick={onDelete} style={{background:'none',border:'none',cursor:'pointer',color:'#e53935',display:'flex'}}><Trash2 size={15}/></button>}
+      </div>
+      {/* Challan No + Date */}
+      <div style={{background:'#fff',borderBottom:'1px solid #eee',padding:'12px 16px',display:'grid',gridTemplateColumns:'1fr 1px 1fr',gap:0}}>
+        <div style={{paddingRight:16}}>
+          <div style={{fontSize:11,color:'#999',marginBottom:3}}>Challan No.</div>
+          <div style={{display:'flex',alignItems:'center',gap:6}}>
+            <input value={f.challanNo} onChange={e=>set('challanNo',e.target.value)} style={{border:'none',background:'transparent',fontSize:15,fontWeight:600,color:'#1a1a1a',width:'90px',outline:'none',padding:0}}/>
+            <ChevronDown size={14} style={{color:'#999'}}/>
+          </div>
+        </div>
+        <div style={{background:'#e0e0e0',width:1,margin:'4px 0'}}/>
+        <div style={{paddingLeft:16}}>
+          <div style={{fontSize:11,color:'#999',marginBottom:3}}>Date</div>
+          <input type="date" value={f.date} onChange={e=>set('date',e.target.value)} style={{border:'none',background:'transparent',fontSize:14,fontWeight:500,color:'#1a1a1a',outline:'none',padding:0,width:130}}/>
+        </div>
+      </div>
+      {/* Customer Name */}
+      <div style={{background:'#fff',marginTop:8,padding:'4px 16px 4px'}}>
+        <div style={{position:'relative',border:'2px solid #1976d2',borderRadius:6,padding:'16px 12px 8px'}}>
+          <label style={{position:'absolute',top:-10,left:10,background:'#fff',padding:'0 4px',fontSize:12,color:'#1976d2',fontWeight:500}}>Customer Name *</label>
+          <input value={f.customerName} onChange={e=>set('customerName',e.target.value)} style={{border:'none',background:'transparent',fontSize:15,color:'#1a1a1a',width:'100%',outline:'none',padding:0}}/>
+        </div>
+      </div>
+      {/* Phone */}
+      <div style={{background:'#fff',marginTop:10,padding:'4px 16px 10px'}}>
+        <div style={{border:'1px solid #ccc',borderRadius:6,padding:'14px 12px'}}>
+          <input value={f.phone} onChange={e=>set('phone',e.target.value)} placeholder="Phone Number" style={{border:'none',background:'transparent',fontSize:15,color:'#1a1a1a',width:'100%',outline:'none',padding:0}}/>
+        </div>
+      </div>
+      {/* Delivery Address */}
+      <div style={{background:'#fff',marginTop:8,padding:'12px 16px'}}>
+        <label style={{fontSize:12,color:'#888',display:'block',marginBottom:6}}>Delivery Address</label>
+        <textarea value={f.deliveryAddress} onChange={e=>set('deliveryAddress',e.target.value)} placeholder="Enter delivery address…" style={{width:'100%',border:'1px solid #ddd',borderRadius:6,padding:'10px',fontSize:14,background:'#fafafa',resize:'vertical',height:64,outline:'none',boxSizing:'border-box'}}/>
+      </div>
+      {/* Vehicle No + Status */}
+      <div style={{background:'#fff',marginTop:8,padding:'12px 16px',display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
+        <div style={{border:'1px solid #ccc',borderRadius:6,padding:'12px'}}>
+          <div style={{fontSize:11,color:'#aaa',marginBottom:4}}>Vehicle No. (Optional)</div>
+          <input value={f.vehicleNo} onChange={e=>set('vehicleNo',e.target.value)} placeholder="e.g. MH12AB1234" style={{border:'none',background:'transparent',fontSize:13,color:'#333',width:'100%',outline:'none',padding:0}}/>
+        </div>
+        <div style={{border:'1px solid #ccc',borderRadius:6,padding:'12px'}}>
+          <div style={{fontSize:11,color:'#aaa',marginBottom:4}}>Status</div>
+          <select value={f.status} onChange={e=>set('status',e.target.value as DeliveryChallan['status'])} style={{border:'none',background:'transparent',fontSize:13,color:'#333',width:'100%',outline:'none',padding:0}}>
+            <option>Draft</option><option>Dispatched</option><option>Delivered</option>
+          </select>
+        </div>
+      </div>
+      {/* Add Items */}
+      <div style={{background:'#fff',marginTop:8,padding:'0 16px 8px'}}>
+        <button onClick={()=>setShowItems(v=>!v)} style={{width:'100%',display:'flex',alignItems:'center',justifyContent:'center',gap:8,padding:'14px',border:'1px solid #1976d2',borderRadius:6,background:'#fff',color:'#1976d2',fontSize:14,fontWeight:600,cursor:'pointer'}}>
+          <span style={{width:22,height:22,borderRadius:'50%',background:'#1976d2',color:'#fff',display:'flex',alignItems:'center',justifyContent:'center',fontSize:16,fontWeight:900,lineHeight:'1'}}>+</span>
+          Add Items <span style={{fontWeight:400,color:'#999'}}>(Optional)</span>
+        </button>
+        {showItems&&(
+          <div style={{marginTop:10,border:'1px solid #e0e0e0',borderRadius:6,padding:'12px'}}>
+            <div style={{display:'grid',gridTemplateColumns:'2fr 1fr auto',gap:8,alignItems:'flex-end',marginBottom:8}}>
+              <div><div style={{fontSize:11,color:'#888',marginBottom:4}}>Book</div>
+                <select value={selBook} onChange={e=>setSelBook(e.target.value)} style={{width:'100%',border:'1px solid #ddd',borderRadius:5,padding:'8px',fontSize:13,outline:'none'}}>
+                  <option value="">Select book…</option>{data.books.map(b=><option key={b.id} value={b.id}>{b.title}</option>)}
+                </select>
+              </div>
+              <div><div style={{fontSize:11,color:'#888',marginBottom:4}}>Qty</div>
+                <input type="number" min="1" value={selQty} onChange={e=>setSelQty(Number(e.target.value))} style={{width:'100%',border:'1px solid #ddd',borderRadius:5,padding:'8px',fontSize:13,outline:'none'}}/>
+              </div>
+              <button onClick={addItem} className="btn primary" style={{padding:'8px 12px',height:36}}><Plus size={13}/></button>
+            </div>
+            {f.items.map(item=>(
+              <div key={item.id} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'8px 0',borderTop:'1px solid #f0f0f0'}}>
+                <div><div style={{fontSize:13,fontWeight:600,color:'#1a1a1a'}}>{item.name}</div><div style={{fontSize:11,color:'#888'}}>{item.qty} × {money(item.price)}</div></div>
+                <div style={{display:'flex',alignItems:'center',gap:8}}><span style={{fontWeight:600}}>{money(item.qty*item.price)}</span><button onClick={()=>removeItem(item.id)} style={{background:'none',border:'none',cursor:'pointer',color:'#ccc',display:'flex'}}><Trash2 size={14}/></button></div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+      {/* Total Amount */}
+      <div style={{background:'#fff',marginTop:8,padding:'0 16px'}}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'18px 0'}}>
+          <span style={{fontSize:15,fontWeight:700,color:'#1a1a1a'}}>Total Amount</span>
+          <div style={{display:'flex',alignItems:'center',gap:4}}>
+            <span style={{fontSize:15,color:'#1a1a1a'}}>₹</span>
+            <div style={{borderBottom:'1px dashed #aaa',minWidth:140,paddingBottom:2}}>
+              <input type="number" min="0" value={f.totalAmount||''} onChange={e=>set('totalAmount',Number(e.target.value))} style={{border:'none',background:'transparent',fontSize:15,fontWeight:600,color:'#1a1a1a',width:'100%',outline:'none',padding:0,textAlign:'right'}}/>
+            </div>
+          </div>
+        </div>
+      </div>
+      {/* Notes */}
+      <div style={{background:'#fff',marginTop:8,padding:'12px 16px'}}>
+        <label style={{fontSize:12,color:'#888',display:'block',marginBottom:6}}>Notes (Optional)</label>
+        <textarea value={f.notes} onChange={e=>set('notes',e.target.value)} placeholder="Add a note…" style={{width:'100%',border:'1px solid #ddd',borderRadius:6,padding:'10px',fontSize:14,background:'#fafafa',resize:'vertical',height:72,outline:'none',boxSizing:'border-box'}}/>
+      </div>
+      {validationMsg&&(
+        <div style={{position:'fixed',bottom:90,left:'50%',transform:'translateX(-50%)',background:'rgba(40,40,40,0.92)',color:'#fff',borderRadius:28,padding:'12px 20px',display:'flex',alignItems:'center',gap:10,fontSize:14,fontWeight:500,zIndex:999,boxShadow:'0 4px 20px rgba(0,0,0,0.25)',whiteSpace:'nowrap'}}>
+          <span style={{width:22,height:22,background:'#e53935',borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center',fontSize:13,flexShrink:0}}>!</span>
+          {validationMsg}
+        </div>
+      )}
+      <div style={{position:'fixed',bottom:0,left:'50%',transform:'translateX(-50%)',width:'100%',maxWidth:520,background:'#fff',borderTop:'1px solid #e8e8e8',display:'grid',gridTemplateColumns:'1fr 1fr auto',zIndex:10}}>
+        <button onClick={()=>handleSave(true)} style={{padding:'16px 0',background:'#fff',border:'none',borderRight:'1px solid #e8e8e8',fontSize:14,fontWeight:600,color:'#555',cursor:'pointer'}} onMouseEnter={e=>(e.currentTarget as HTMLButtonElement).style.background='#f5f5f5'} onMouseLeave={e=>(e.currentTarget as HTMLButtonElement).style.background='#fff'}>Save &amp; New</button>
+        <button onClick={()=>handleSave(false)} style={{padding:'16px 0',background:'#1565c0',border:'none',fontSize:14,fontWeight:700,color:'#fff',cursor:'pointer'}} onMouseEnter={e=>(e.currentTarget as HTMLButtonElement).style.background='#0d47a1'} onMouseLeave={e=>(e.currentTarget as HTMLButtonElement).style.background='#1565c0'}>Save</button>
+        <button style={{padding:'16px 18px',background:'#fff',border:'none',borderLeft:'1px solid #e8e8e8',fontSize:20,color:'#555',cursor:'pointer',lineHeight:1}} title="More options">⋮</button>
+      </div>
+    </main>
+  );
+}
+
 function ComingSoon({title,sub,Icon}:{title:string;sub:string;Icon:any}){
   return <main className="page"><div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',minHeight:'55vh',textAlign:'center',gap:14}}><div style={{width:60,height:60,borderRadius:18,background:'#e8f0e6',display:'grid',placeItems:'center',color:'#3d6b4a'}}><Icon size={26}/></div><h1 style={{fontFamily:'var(--app-font-serif)',fontSize:'clamp(22px,3vw,30px)',color:'#1e3d2c',margin:0}}>{title}</h1><p style={{fontSize:13,color:'#6d7d6e',maxWidth:380,margin:0,lineHeight:1.6}}>{sub}</p><span style={{fontSize:11,color:'#9aaa99',background:'#f0ede4',padding:'6px 14px',borderRadius:20,fontWeight:600}}>Coming soon</span></div></main>;
 }
@@ -341,12 +1220,12 @@ function AppContent(){
       <Route path="/inventory"><Inventory {...context}/></Route>
       <Route path="/purchases"><Purchases {...context}/></Route>
       <Route path="/sale/invoice"><SaleInvoicePage {...context}/></Route>
-      <Route path="/sale/payment-in"><ComingSoon title="Payment-In" sub="Record incoming payments from customers." Icon={ArrowDownLeft}/></Route>
-      <Route path="/sale/return"><ComingSoon title="Sale Return" sub="Process credit notes and book returns." Icon={RotateCcw}/></Route>
-      <Route path="/sale/estimate"><ComingSoon title="Estimate / Quotation" sub="Send estimates and quotations to customers." Icon={ClipboardList}/></Route>
+      <Route path="/sale/payment-in"><PaymentInPage {...context}/></Route>
+      <Route path="/sale/return"><SaleReturnPage {...context}/></Route>
+      <Route path="/sale/estimate"><EstimatePage {...context}/></Route>
       <Route path="/sale/proforma"><ComingSoon title="Proforma Invoice" sub="Issue proforma invoices before final billing." Icon={FilePen}/></Route>
       <Route path="/sale/order"><ComingSoon title="Sale Order" sub="Track and manage customer orders." Icon={ShoppingBag}/></Route>
-      <Route path="/sale/challan"><ComingSoon title="Delivery Challan" sub="Generate delivery challans for dispatches." Icon={Package}/></Route>
+      <Route path="/sale/challan"><DeliveryChallanPage {...context}/></Route>
       <Route path="/sale/pos"><ComingSoon title="Mobile POS" sub="Quick point-of-sale billing on the go." Icon={Smartphone}/></Route>
       <Route path="/purchases"><Purchases {...context}/></Route>
       <Route path="/purchase/bill"><ComingSoon title="Purchase Bill" sub="Create and record bills from your suppliers." Icon={FileInput}/></Route>
