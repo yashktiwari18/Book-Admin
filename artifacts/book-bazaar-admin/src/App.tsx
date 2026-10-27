@@ -1379,6 +1379,240 @@ function SaleOrderForm({data,initial,nextNo,nowTime,onSave,onClose,onDelete}:{da
   );
 }
 
+// ─────────────────────────── Proforma Invoice ───────────────────────────
+const PROFORMA_KEY='bookbazaar-proforma-v1';
+type ProformaItem={id:string;bookId:string;name:string;qty:number;price:number;discount:number};
+type ProformaInvoice={id:string;refNo:string;date:string;time:string;customerName:string;billingName:string;items:ProformaItem[];subTotal:number;discountAmt:number;totalAmount:number;notes:string;status:'Draft'|'Sent'|'Converted'|'Cancelled'};
+function ProformaInvoicePage(c:Context){
+  const [records,setRecords]=useState<ProformaInvoice[]>(()=>{try{const v=localStorage.getItem(PROFORMA_KEY);return v?JSON.parse(v):[];}catch{return [];}});
+  const [view,setView]=useState<'list'|'form'>('list');
+  const [editing,setEditing]=useState<ProformaInvoice|null>(null);
+  const [dateRange,setDateRange]=useState({from:today.slice(0,8)+'01',to:today});
+  useEffect(()=>{localStorage.setItem(PROFORMA_KEY,JSON.stringify(records));},[records]);
+  const nowTime=()=>new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',hour12:true});
+  const nextRefNo=()=>`JMD/...${records.length+1}`;
+  const openNew=()=>{setEditing(null);setView('form');};
+  const openEdit=(r:ProformaInvoice)=>{setEditing(r);setView('form');};
+  const closeForm=()=>{setView('list');setEditing(null);};
+  const save=(r:ProformaInvoice,andNew?:boolean)=>{setRecords(prev=>editing?prev.map(x=>x.id===r.id?r:x):[r,...prev]);if(andNew)setEditing(null);else closeForm();};
+  const del=(id:string)=>setRecords(prev=>prev.filter(x=>x.id!==id));
+  if(view==='form')return <ProformaInvoiceForm data={c.data} initial={editing} nextRefNo={nextRefNo()} nowTime={nowTime()} onSave={save} onClose={closeForm} onDelete={editing?()=>{del(editing.id);closeForm();}:undefined}/>;
+  const filtered=records.filter(r=>r.date>=dateRange.from&&r.date<=dateRange.to);
+  const statusColor=(s:string)=>s==='Converted'?'#2e7d32':s==='Sent'?'#1565c0':s==='Cancelled'?'#a24840':'#888';
+  const filterBar=(
+    <div style={{background:'#fff',borderBottom:'1px solid #e8e8e8',padding:'10px 20px',display:'flex',alignItems:'center',gap:12,flexWrap:'wrap'}}>
+      <select style={{border:'1px solid #ddd',borderRadius:6,padding:'6px 12px',fontSize:13,color:'#333',background:'#fafafa',outline:'none',cursor:'pointer'}}>
+        <option>This Month</option><option>Last Month</option><option>This Quarter</option><option>Custom</option>
+      </select>
+      <div style={{display:'flex',alignItems:'center',gap:8,fontSize:13,color:'#444'}}>
+        <CalendarDays size={16} style={{color:'#1976d2'}}/>
+        <input type="date" value={dateRange.from} onChange={e=>setDateRange(p=>({...p,from:e.target.value}))} style={{border:'none',background:'transparent',fontSize:13,color:'#333',outline:'none',cursor:'pointer'}}/>
+        <span style={{fontWeight:600,color:'#666'}}>TO</span>
+        <input type="date" value={dateRange.to} onChange={e=>setDateRange(p=>({...p,to:e.target.value}))} style={{border:'none',background:'transparent',fontSize:13,color:'#333',outline:'none',cursor:'pointer'}}/>
+      </div>
+    </div>
+  );
+  if(!records.length) return (
+    <main className="page">
+      {filterBar}
+      <div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',minHeight:'60vh',textAlign:'center',gap:14,background:'#eef4fb'}}>
+        <svg width="110" height="110" viewBox="0 0 110 110" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect x="20" y="14" width="70" height="86" rx="7" fill="#dce8f5"/>
+          <rect x="20" y="14" width="70" height="86" rx="7" stroke="#b8d0ea" strokeWidth="1.5"/>
+          <rect x="32" y="30" width="46" height="7" rx="3" fill="#1976d2" opacity="0.3"/>
+          <rect x="32" y="44" width="36" height="5" rx="2.5" fill="#e3eefa"/>
+          <rect x="32" y="55" width="42" height="5" rx="2.5" fill="#e3eefa"/>
+          <rect x="32" y="66" width="30" height="5" rx="2.5" fill="#e3eefa"/>
+          <rect x="32" y="80" width="46" height="7" rx="3" fill="#1976d2" opacity="0.15"/>
+          <rect x="74" y="78" width="20" height="8" rx="4" fill="#1976d2"/>
+          <line x1="79" y1="82" x2="89" y2="82" stroke="#fff" strokeWidth="2" strokeLinecap="round"/>
+          <line x1="84" y1="78.5" x2="84" y2="85.5" stroke="#fff" strokeWidth="2" strokeLinecap="round"/>
+        </svg>
+        <h2 style={{fontFamily:'var(--app-font-serif)',fontSize:20,fontWeight:700,color:'#1a1a1a',margin:0}}>No Proforma Invoices Yet</h2>
+        <p style={{fontSize:13,color:'#6d7d6e',maxWidth:320,margin:0,lineHeight:1.6}}>Issue proforma invoices to customers before finalising billing. Easy to convert to a sale invoice.</p>
+        <button className="btn primary" onClick={openNew} style={{marginTop:8,display:'flex',alignItems:'center',gap:7,fontSize:14}}>
+          <Plus size={15}/> Add Proforma Invoice
+        </button>
+      </div>
+    </main>
+  );
+  return (
+    <main className="page">
+      {filterBar}
+      <div style={{padding:'14px 20px 0',display:'flex',justifyContent:'flex-end'}}>
+        <button className="btn primary" onClick={openNew} style={{display:'flex',alignItems:'center',gap:7}}><Plus size={14}/> Add Proforma Invoice</button>
+      </div>
+      <div className="stat-grid" style={{marginTop:14}}>
+        <Stat label="Total Proforma" value={filtered.length} note="In selected period" Icon={FilePen}/>
+        <Stat label="Total Value" value={money(filtered.reduce((s,r)=>s+r.totalAmount,0))} note="Quoted amount" Icon={FileText}/>
+        <Stat label="Sent" value={filtered.filter(r=>r.status==='Sent').length} note="Awaiting response" Icon={ArrowRight}/>
+        <Stat label="Converted" value={filtered.filter(r=>r.status==='Converted').length} note="To sale invoice" Icon={Check} tint="green"/>
+      </div>
+      <section className="panel">
+        <div className="table-wrap"><table className="data-table">
+          <thead><tr><th>Ref No.</th><th>Customer</th><th>Billing Name</th><th>Date</th><th>Items</th><th>Total</th><th>Status</th><th></th></tr></thead>
+          <tbody>{filtered.map(r=>(
+            <tr key={r.id}>
+              <td><div className="book-title">{r.refNo}</div><div className="muted">{r.time}</div></td>
+              <td><div className="book-title">{r.customerName||'—'}</div></td>
+              <td>{r.billingName||'—'}</td>
+              <td>{r.date}</td>
+              <td>{r.items.length} item{r.items.length!==1?'s':''}</td>
+              <td style={{fontWeight:600}}>{money(r.totalAmount)}</td>
+              <td><span style={{fontSize:12,fontWeight:600,padding:'3px 8px',borderRadius:12,background:`${statusColor(r.status)}18`,color:statusColor(r.status)}}>{r.status}</span></td>
+              <td><div className="row-actions"><button className="icon-button" title="Edit" onClick={()=>openEdit(r)}><Pencil/></button><button className="icon-button" title="Delete" onClick={()=>del(r.id)}><Trash2/></button></div></td>
+            </tr>
+          ))}</tbody>
+        </table></div>
+      </section>
+    </main>
+  );
+}
+function ProformaInvoiceForm({data,initial,nextRefNo,nowTime,onSave,onClose,onDelete}:{data:Dataset;initial:ProformaInvoice|null;nextRefNo:string;nowTime:string;onSave:(r:ProformaInvoice,andNew?:boolean)=>void;onClose:()=>void;onDelete?:()=>void}){
+  const blank:Omit<ProformaInvoice,'id'>={refNo:nextRefNo,date:today,time:nowTime,customerName:'',billingName:'',items:[],subTotal:0,discountAmt:0,totalAmount:0,notes:'',status:'Draft'};
+  const [f,setF]=useState<Omit<ProformaInvoice,'id'>>(initial||blank);
+  const [showItems,setShowItems]=useState(false);
+  const [selBook,setSelBook]=useState('');
+  const [selQty,setSelQty]=useState(1);
+  const [selDisc,setSelDisc]=useState(0);
+  const [validationMsg,setValidationMsg]=useState('');
+  const set=(k:string,v:any)=>setF(p=>({...p,[k]:v}));
+  useEffect(()=>{if(!validationMsg)return;const t=setTimeout(()=>setValidationMsg(''),2800);return()=>clearTimeout(t);},[validationMsg]);
+  const recalc=(items:ProformaItem[])=>{const sub=items.reduce((s,i)=>s+i.qty*i.price,0);const disc=items.reduce((s,i)=>s+i.qty*i.price*(i.discount/100),0);return{subTotal:sub,discountAmt:disc,totalAmount:sub-disc};};
+  const addItem=()=>{const book=data.books.find(b=>b.id===selBook);if(!book)return;const newItem={id:idFor('PI'),bookId:book.id,name:book.title,qty:selQty,price:book.price,discount:selDisc};const items=[...f.items,newItem];setF(p=>({...p,items,...recalc(items)}));setSelBook('');setSelQty(1);setSelDisc(0);setShowItems(false);};
+  const removeItem=(id:string)=>{const items=f.items.filter(i=>i.id!==id);setF(p=>({...p,items,...recalc(items)}));};
+  const handleSave=(andNew=false)=>{if(!f.customerName.trim()){setValidationMsg('Customer name is required');return;}const rec:ProformaInvoice={...f,id:initial?.id||idFor('PF')};onSave(rec,andNew);if(andNew){const num=Number(f.refNo.replace('JMD/...','')||'0')+1;setF({...blank,refNo:`JMD/...${num}`,time:f.time});}};
+  const fmtDate=(d:string)=>{if(!d)return '';const[y,m,day]=d.split('-');return `${day}/${m}/${y}`;};
+  return(
+    <main style={{minHeight:'100vh',background:'#f0f0f0',display:'flex',flexDirection:'column',maxWidth:520,margin:'0 auto',position:'relative',paddingBottom:80}}>
+      {/* Header */}
+      <div style={{background:'#fff',borderBottom:'1px solid #e8e8e8',padding:'14px 16px',display:'flex',alignItems:'center',justifyContent:'space-between',position:'sticky',top:0,zIndex:10}}>
+        <div style={{display:'flex',alignItems:'center',gap:12}}>
+          <button onClick={onClose} style={{background:'none',border:'none',cursor:'pointer',padding:4,display:'flex',alignItems:'center',color:'#333'}}><ArrowRight style={{transform:'rotate(180deg)'}} size={22}/></button>
+          <h1 style={{fontSize:18,fontWeight:700,color:'#1a1a1a',margin:0}}>Proforma Invoice</h1>
+        </div>
+        <div style={{display:'flex',alignItems:'center',gap:8}}>
+          {onDelete&&<button onClick={onDelete} style={{background:'none',border:'none',cursor:'pointer',color:'#e53935',display:'flex'}}><Trash2 size={15}/></button>}
+        </div>
+      </div>
+      {/* 3-col: Ref No | Date | Time */}
+      <div style={{background:'#fff',borderBottom:'1px solid #eee',padding:'12px 0',display:'grid',gridTemplateColumns:'1fr 1px 1fr 1px 1fr'}}>
+        <div style={{padding:'0 14px'}}>
+          <div style={{fontSize:11,color:'#aaa',marginBottom:4}}>Ref No.</div>
+          <div style={{display:'flex',alignItems:'center',gap:4}}>
+            <input value={f.refNo} onChange={e=>set('refNo',e.target.value)} style={{border:'none',background:'transparent',fontSize:13,fontWeight:600,color:'#1a1a1a',width:'100%',outline:'none',padding:0}}/>
+            <ChevronDown size={13} style={{color:'#aaa',flexShrink:0}}/>
+          </div>
+        </div>
+        <div style={{background:'#e8e8e8',width:1,margin:'2px 0'}}/>
+        <div style={{padding:'0 14px'}}>
+          <div style={{fontSize:11,color:'#aaa',marginBottom:4}}>Date</div>
+          <div style={{display:'flex',alignItems:'center',gap:4}}>
+            <input type="date" value={f.date} onChange={e=>set('date',e.target.value)} style={{border:'none',background:'transparent',fontSize:13,fontWeight:500,color:'#1a1a1a',outline:'none',padding:0,width:'100%'}}/>
+            <ChevronDown size={13} style={{color:'#aaa',flexShrink:0}}/>
+          </div>
+        </div>
+        <div style={{background:'#e8e8e8',width:1,margin:'2px 0'}}/>
+        <div style={{padding:'0 14px'}}>
+          <div style={{fontSize:11,color:'#aaa',marginBottom:4}}>Time</div>
+          <div style={{display:'flex',alignItems:'center',gap:4}}>
+            <input value={f.time} onChange={e=>set('time',e.target.value)} style={{border:'none',background:'transparent',fontSize:13,fontWeight:500,color:'#1a1a1a',width:'100%',outline:'none',padding:0}}/>
+            <ChevronDown size={13} style={{color:'#aaa',flexShrink:0}}/>
+          </div>
+        </div>
+      </div>
+      {/* Customer Name * */}
+      <div style={{background:'#fff',marginTop:12,padding:'4px 16px 12px'}}>
+        <div style={{position:'relative',border:'2px solid #1976d2',borderRadius:6,padding:'16px 12px 10px'}}>
+          <label style={{position:'absolute',top:-10,left:10,background:'#fff',padding:'0 4px',fontSize:12,color:'#1976d2',fontWeight:500}}>Customer Name *</label>
+          <input value={f.customerName} onChange={e=>set('customerName',e.target.value)} style={{border:'none',background:'transparent',fontSize:15,color:'#1a1a1a',width:'100%',outline:'none',padding:0}}/>
+        </div>
+      </div>
+      {/* Billing Name (Optional) */}
+      <div style={{background:'#fff',marginTop:10,padding:'4px 16px 14px'}}>
+        <div style={{border:'1px solid #ccc',borderRadius:6,padding:'16px 12px 10px'}}>
+          <input value={f.billingName} onChange={e=>set('billingName',e.target.value)} placeholder="Billing Name (Optional)" style={{border:'none',background:'transparent',fontSize:15,color:'#1a1a1a',width:'100%',outline:'none',padding:0}}/>
+        </div>
+      </div>
+      {/* Status (small row) */}
+      <div style={{background:'#fff',marginTop:8,padding:'10px 16px',display:'flex',alignItems:'center',justifyContent:'space-between',borderTop:'1px solid #f5f5f5'}}>
+        <span style={{fontSize:13,color:'#888'}}>Status</span>
+        <select value={f.status} onChange={e=>set('status',e.target.value as ProformaInvoice['status'])} style={{border:'1px solid #ddd',borderRadius:6,padding:'5px 10px',fontSize:13,background:'#fafafa',color:'#333',outline:'none',cursor:'pointer'}}>
+          <option>Draft</option><option>Sent</option><option>Converted</option><option>Cancelled</option>
+        </select>
+      </div>
+      {/* + Add Items (Optional) */}
+      <div style={{background:'#fff',marginTop:8,padding:'0 16px 8px'}}>
+        <button onClick={()=>setShowItems(v=>!v)} style={{width:'100%',display:'flex',alignItems:'center',justifyContent:'center',gap:8,padding:'16px',border:'1px solid #e0e0e0',borderRadius:6,background:'#fff',color:'#333',fontSize:15,fontWeight:500,cursor:'pointer'}}>
+          <span style={{width:26,height:26,borderRadius:'50%',background:'#1976d2',color:'#fff',display:'flex',alignItems:'center',justifyContent:'center',fontSize:18,fontWeight:900,lineHeight:'1',flexShrink:0}}>+</span>
+          <span><b style={{color:'#1976d2'}}>Add Items</b> <span style={{color:'#999',fontWeight:400}}>(Optional)</span></span>
+        </button>
+        {showItems&&(
+          <div style={{marginTop:10,border:'1px solid #e0e0e0',borderRadius:6,padding:'12px',background:'#fafafa'}}>
+            <div style={{display:'grid',gridTemplateColumns:'2fr 1fr 1fr auto',gap:8,alignItems:'flex-end',marginBottom:8}}>
+              <div><div style={{fontSize:11,color:'#888',marginBottom:4}}>Book</div>
+                <select value={selBook} onChange={e=>setSelBook(e.target.value)} style={{width:'100%',border:'1px solid #ddd',borderRadius:5,padding:'7px',fontSize:13,outline:'none',background:'#fff'}}>
+                  <option value="">Select…</option>{data.books.map(b=><option key={b.id} value={b.id}>{b.title}</option>)}
+                </select>
+              </div>
+              <div><div style={{fontSize:11,color:'#888',marginBottom:4}}>Qty</div>
+                <input type="number" min="1" value={selQty} onChange={e=>setSelQty(Number(e.target.value))} style={{width:'100%',border:'1px solid #ddd',borderRadius:5,padding:'7px',fontSize:13,outline:'none'}}/>
+              </div>
+              <div><div style={{fontSize:11,color:'#888',marginBottom:4}}>Disc %</div>
+                <input type="number" min="0" max="100" value={selDisc} onChange={e=>setSelDisc(Number(e.target.value))} style={{width:'100%',border:'1px solid #ddd',borderRadius:5,padding:'7px',fontSize:13,outline:'none'}}/>
+              </div>
+              <button onClick={addItem} className="btn primary" style={{padding:'7px 10px',height:34,alignSelf:'flex-end'}}><Plus size={13}/></button>
+            </div>
+            {f.items.map(item=>(
+              <div key={item.id} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'8px 0',borderTop:'1px solid #f0f0f0'}}>
+                <div><div style={{fontSize:13,fontWeight:600,color:'#1a1a1a'}}>{item.name}</div><div style={{fontSize:11,color:'#888'}}>{item.qty} × {money(item.price)}{item.discount>0?` − ${item.discount}%`:''}</div></div>
+                <div style={{display:'flex',alignItems:'center',gap:8}}><span style={{fontWeight:600}}>{money(item.qty*item.price*(1-item.discount/100))}</span><button onClick={()=>removeItem(item.id)} style={{background:'none',border:'none',cursor:'pointer',color:'#ccc',display:'flex'}}><Trash2 size={14}/></button></div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+      {/* Total Amount */}
+      <div style={{background:'#fff',marginTop:8,padding:'0 16px'}}>
+        {f.items.length>0&&<>
+          <div style={{display:'flex',justifyContent:'space-between',padding:'12px 0',borderBottom:'1px dashed #eee',fontSize:14,color:'#555'}}>
+            <span>Sub Total</span><span>{money(f.subTotal)}</span>
+          </div>
+          {f.discountAmt>0&&<div style={{display:'flex',justifyContent:'space-between',padding:'10px 0',borderBottom:'1px dashed #eee',fontSize:14,color:'#a24840'}}>
+            <span>Discount</span><span>− {money(f.discountAmt)}</span>
+          </div>}
+        </>}
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'20px 0'}}>
+          <span style={{fontSize:16,fontWeight:700,color:'#1a1a1a'}}>Total Amount</span>
+          <div style={{display:'flex',alignItems:'center',gap:4}}>
+            <span style={{fontSize:16,color:'#1a1a1a',fontWeight:700}}>₹</span>
+            <div style={{borderBottom:'2px dashed #bbb',minWidth:160,paddingBottom:3}}>
+              <input type="number" min="0" value={f.totalAmount||''} onChange={e=>set('totalAmount',Number(e.target.value))} placeholder="" style={{border:'none',background:'transparent',fontSize:16,fontWeight:700,color:'#1a1a1a',width:'100%',outline:'none',padding:0,textAlign:'right'}}/>
+            </div>
+          </div>
+        </div>
+      </div>
+      {/* Notes */}
+      <div style={{background:'#fff',marginTop:8,padding:'12px 16px'}}>
+        <label style={{fontSize:12,color:'#888',display:'block',marginBottom:6}}>Notes (Optional)</label>
+        <textarea value={f.notes} onChange={e=>set('notes',e.target.value)} placeholder="Add a note or terms…" style={{width:'100%',border:'1px solid #ddd',borderRadius:6,padding:'10px',fontSize:14,background:'#fafafa',resize:'vertical',height:68,outline:'none',boxSizing:'border-box'}}/>
+      </div>
+      {validationMsg&&(
+        <div style={{position:'fixed',bottom:90,left:'50%',transform:'translateX(-50%)',background:'rgba(40,40,40,0.92)',color:'#fff',borderRadius:28,padding:'12px 20px',display:'flex',alignItems:'center',gap:10,fontSize:14,fontWeight:500,zIndex:999,boxShadow:'0 4px 20px rgba(0,0,0,0.25)',whiteSpace:'nowrap'}}>
+          <span style={{width:22,height:22,background:'#e53935',borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center',fontSize:13,flexShrink:0}}>!</span>
+          {validationMsg}
+        </div>
+      )}
+      {/* Bottom action bar */}
+      <div style={{position:'fixed',bottom:0,left:'50%',transform:'translateX(-50%)',width:'100%',maxWidth:520,background:'#fff',borderTop:'1px solid #e8e8e8',display:'grid',gridTemplateColumns:'1fr 1fr auto',zIndex:10}}>
+        <button onClick={()=>handleSave(true)} style={{padding:'16px 0',background:'#fff',border:'none',borderRight:'1px solid #e8e8e8',fontSize:14,fontWeight:600,color:'#555',cursor:'pointer'}} onMouseEnter={e=>(e.currentTarget as HTMLButtonElement).style.background='#f5f5f5'} onMouseLeave={e=>(e.currentTarget as HTMLButtonElement).style.background='#fff'}>Save &amp; New</button>
+        <button onClick={()=>handleSave(false)} style={{padding:'16px 0',background:'#1565c0',border:'none',fontSize:14,fontWeight:700,color:'#fff',cursor:'pointer'}} onMouseEnter={e=>(e.currentTarget as HTMLButtonElement).style.background='#0d47a1'} onMouseLeave={e=>(e.currentTarget as HTMLButtonElement).style.background='#1565c0'}>Save</button>
+        <button style={{padding:'16px 18px',background:'#fff',border:'none',borderLeft:'1px solid #e8e8e8',fontSize:20,color:'#555',cursor:'pointer',lineHeight:1}} title="More options">⋮</button>
+      </div>
+    </main>
+  );
+}
+
 function ComingSoon({title,sub,Icon}:{title:string;sub:string;Icon:any}){
   return <main className="page"><div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',minHeight:'55vh',textAlign:'center',gap:14}}><div style={{width:60,height:60,borderRadius:18,background:'#e8f0e6',display:'grid',placeItems:'center',color:'#3d6b4a'}}><Icon size={26}/></div><h1 style={{fontFamily:'var(--app-font-serif)',fontSize:'clamp(22px,3vw,30px)',color:'#1e3d2c',margin:0}}>{title}</h1><p style={{fontSize:13,color:'#6d7d6e',maxWidth:380,margin:0,lineHeight:1.6}}>{sub}</p><span style={{fontSize:11,color:'#9aaa99',background:'#f0ede4',padding:'6px 14px',borderRadius:20,fontWeight:600}}>Coming soon</span></div></main>;
 }
@@ -1464,7 +1698,7 @@ function AppContent(){
       <Route path="/sale/payment-in"><PaymentInPage {...context}/></Route>
       <Route path="/sale/return"><SaleReturnPage {...context}/></Route>
       <Route path="/sale/estimate"><EstimatePage {...context}/></Route>
-      <Route path="/sale/proforma"><ComingSoon title="Proforma Invoice" sub="Issue proforma invoices before final billing." Icon={FilePen}/></Route>
+      <Route path="/sale/proforma"><ProformaInvoicePage {...context}/></Route>
       <Route path="/sale/order"><SaleOrderPage {...context}/></Route>
       <Route path="/sale/challan"><DeliveryChallanPage {...context}/></Route>
       <Route path="/sale/pos"><ComingSoon title="Mobile POS" sub="Quick point-of-sale billing on the go." Icon={Smartphone}/></Route>
