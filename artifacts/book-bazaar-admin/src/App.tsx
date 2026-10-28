@@ -479,7 +479,7 @@ function PaymentInForm({initial,nextNo,nowTime,onSave,onClose,onDelete}:{initial
       )}
 
       {/* Bottom Action Bar */}
-      <div style={{position:'fixed',bottom:0,left:'50%',transform:'translateX(-50%)',width:'100%',maxWidth:520,background:'#fff',borderTop:'1px solid #e8e8e8',display:'grid',gridTemplateColumns:'1fr 1fr auto',zIndex:10}}>
+      <div style={{position:'sticky',bottom:0,background:'#fff',borderTop:'1px solid #e8e8e8',display:'grid',gridTemplateColumns:'1fr 1fr auto',zIndex:10,marginTop:'auto'}}>
         <button
           onClick={()=>handleSave(true)}
           style={{padding:'16px 0',background:'#fff',border:'none',borderRight:'1px solid #e8e8e8',fontSize:14,fontWeight:600,color:'#555',cursor:'pointer',transition:'background .15s'}}
@@ -692,7 +692,7 @@ function SaleReturnForm({data,initial,nextNo,nowTime,onSave,onClose,onDelete}:{d
           {validationMsg}
         </div>
       )}
-      <div style={{position:'fixed',bottom:0,left:'50%',transform:'translateX(-50%)',width:'100%',maxWidth:520,background:'#fff',borderTop:'1px solid #e8e8e8',display:'grid',gridTemplateColumns:'1fr 1fr auto',zIndex:10}}>
+      <div style={{position:'sticky',bottom:0,background:'#fff',borderTop:'1px solid #e8e8e8',display:'grid',gridTemplateColumns:'1fr 1fr auto',zIndex:10,marginTop:'auto'}}>
         <button onClick={()=>handleSave(true)} style={{padding:'16px 0',background:'#fff',border:'none',borderRight:'1px solid #e8e8e8',fontSize:14,fontWeight:600,color:'#555',cursor:'pointer'}} onMouseEnter={e=>(e.currentTarget as HTMLButtonElement).style.background='#f5f5f5'} onMouseLeave={e=>(e.currentTarget as HTMLButtonElement).style.background='#fff'}>Save &amp; New</button>
         <button onClick={()=>handleSave(false)} style={{padding:'16px 0',background:'#1565c0',border:'none',fontSize:14,fontWeight:700,color:'#fff',cursor:'pointer'}} onMouseEnter={e=>(e.currentTarget as HTMLButtonElement).style.background='#0d47a1'} onMouseLeave={e=>(e.currentTarget as HTMLButtonElement).style.background='#1565c0'}>Save</button>
         <button style={{padding:'16px 18px',background:'#fff',border:'none',borderLeft:'1px solid #e8e8e8',fontSize:20,color:'#555',cursor:'pointer',lineHeight:1}} title="More options">⋮</button>
@@ -915,7 +915,7 @@ function EstimateForm({data,initial,nextNo,nowTime,onSave,onClose,onDelete}:{dat
           {validationMsg}
         </div>
       )}
-      <div style={{position:'fixed',bottom:0,left:'50%',transform:'translateX(-50%)',width:'100%',maxWidth:520,background:'#fff',borderTop:'1px solid #e8e8e8',display:'grid',gridTemplateColumns:'1fr 1fr auto',zIndex:10}}>
+      <div style={{position:'sticky',bottom:0,background:'#fff',borderTop:'1px solid #e8e8e8',display:'grid',gridTemplateColumns:'1fr 1fr auto',zIndex:10,marginTop:'auto'}}>
         <button onClick={()=>handleSave(true)} style={{padding:'16px 0',background:'#fff',border:'none',borderRight:'1px solid #e8e8e8',fontSize:14,fontWeight:600,color:'#555',cursor:'pointer'}} onMouseEnter={e=>(e.currentTarget as HTMLButtonElement).style.background='#f5f5f5'} onMouseLeave={e=>(e.currentTarget as HTMLButtonElement).style.background='#fff'}>Save &amp; New</button>
         <button onClick={()=>handleSave(false)} style={{padding:'16px 0',background:'#1565c0',border:'none',fontSize:14,fontWeight:700,color:'#fff',cursor:'pointer'}} onMouseEnter={e=>(e.currentTarget as HTMLButtonElement).style.background='#0d47a1'} onMouseLeave={e=>(e.currentTarget as HTMLButtonElement).style.background='#1565c0'}>Save</button>
         <button style={{padding:'16px 18px',background:'#fff',border:'none',borderLeft:'1px solid #e8e8e8',fontSize:20,color:'#555',cursor:'pointer',lineHeight:1}} title="More options">⋮</button>
@@ -1129,7 +1129,7 @@ function DeliveryChallanForm({data,initial,nextNo,nowTime,onSave,onClose,onDelet
           {validationMsg}
         </div>
       )}
-      <div style={{position:'fixed',bottom:0,left:'50%',transform:'translateX(-50%)',width:'100%',maxWidth:520,background:'#fff',borderTop:'1px solid #e8e8e8',display:'grid',gridTemplateColumns:'1fr 1fr auto',zIndex:10}}>
+      <div style={{position:'sticky',bottom:0,background:'#fff',borderTop:'1px solid #e8e8e8',display:'grid',gridTemplateColumns:'1fr 1fr auto',zIndex:10,marginTop:'auto'}}>
         <button onClick={()=>handleSave(true)} style={{padding:'16px 0',background:'#fff',border:'none',borderRight:'1px solid #e8e8e8',fontSize:14,fontWeight:600,color:'#555',cursor:'pointer'}} onMouseEnter={e=>(e.currentTarget as HTMLButtonElement).style.background='#f5f5f5'} onMouseLeave={e=>(e.currentTarget as HTMLButtonElement).style.background='#fff'}>Save &amp; New</button>
         <button onClick={()=>handleSave(false)} style={{padding:'16px 0',background:'#1565c0',border:'none',fontSize:14,fontWeight:700,color:'#fff',cursor:'pointer'}} onMouseEnter={e=>(e.currentTarget as HTMLButtonElement).style.background='#0d47a1'} onMouseLeave={e=>(e.currentTarget as HTMLButtonElement).style.background='#1565c0'}>Save</button>
         <button style={{padding:'16px 18px',background:'#fff',border:'none',borderLeft:'1px solid #e8e8e8',fontSize:20,color:'#555',cursor:'pointer',lineHeight:1}} title="More options">⋮</button>
@@ -1370,7 +1370,7 @@ function SaleOrderForm({data,initial,nextNo,nowTime,onSave,onClose,onDelete}:{da
           {validationMsg}
         </div>
       )}
-      <div style={{position:'fixed',bottom:0,left:'50%',transform:'translateX(-50%)',width:'100%',maxWidth:520,background:'#fff',borderTop:'1px solid #e8e8e8',display:'grid',gridTemplateColumns:'1fr 1fr auto',zIndex:10}}>
+      <div style={{position:'sticky',bottom:0,background:'#fff',borderTop:'1px solid #e8e8e8',display:'grid',gridTemplateColumns:'1fr 1fr auto',zIndex:10,marginTop:'auto'}}>
         <button onClick={()=>handleSave(true)} style={{padding:'16px 0',background:'#fff',border:'none',borderRight:'1px solid #e8e8e8',fontSize:14,fontWeight:600,color:'#555',cursor:'pointer'}} onMouseEnter={e=>(e.currentTarget as HTMLButtonElement).style.background='#f5f5f5'} onMouseLeave={e=>(e.currentTarget as HTMLButtonElement).style.background='#fff'}>Save &amp; New</button>
         <button onClick={()=>handleSave(false)} style={{padding:'16px 0',background:'#1565c0',border:'none',fontSize:14,fontWeight:700,color:'#fff',cursor:'pointer'}} onMouseEnter={e=>(e.currentTarget as HTMLButtonElement).style.background='#0d47a1'} onMouseLeave={e=>(e.currentTarget as HTMLButtonElement).style.background='#1565c0'}>Save</button>
         <button style={{padding:'16px 18px',background:'#fff',border:'none',borderLeft:'1px solid #e8e8e8',fontSize:20,color:'#555',cursor:'pointer',lineHeight:1}} title="More options">⋮</button>
@@ -1604,7 +1604,7 @@ function ProformaInvoiceForm({data,initial,nextRefNo,nowTime,onSave,onClose,onDe
         </div>
       )}
       {/* Bottom action bar */}
-      <div style={{position:'fixed',bottom:0,left:'50%',transform:'translateX(-50%)',width:'100%',maxWidth:520,background:'#fff',borderTop:'1px solid #e8e8e8',display:'grid',gridTemplateColumns:'1fr 1fr auto',zIndex:10}}>
+      <div style={{position:'sticky',bottom:0,background:'#fff',borderTop:'1px solid #e8e8e8',display:'grid',gridTemplateColumns:'1fr 1fr auto',zIndex:10,marginTop:'auto'}}>
         <button onClick={()=>handleSave(true)} style={{padding:'16px 0',background:'#fff',border:'none',borderRight:'1px solid #e8e8e8',fontSize:14,fontWeight:600,color:'#555',cursor:'pointer'}} onMouseEnter={e=>(e.currentTarget as HTMLButtonElement).style.background='#f5f5f5'} onMouseLeave={e=>(e.currentTarget as HTMLButtonElement).style.background='#fff'}>Save &amp; New</button>
         <button onClick={()=>handleSave(false)} style={{padding:'16px 0',background:'#1565c0',border:'none',fontSize:14,fontWeight:700,color:'#fff',cursor:'pointer'}} onMouseEnter={e=>(e.currentTarget as HTMLButtonElement).style.background='#0d47a1'} onMouseLeave={e=>(e.currentTarget as HTMLButtonElement).style.background='#1565c0'}>Save</button>
         <button style={{padding:'16px 18px',background:'#fff',border:'none',borderLeft:'1px solid #e8e8e8',fontSize:20,color:'#555',cursor:'pointer',lineHeight:1}} title="More options">⋮</button>
