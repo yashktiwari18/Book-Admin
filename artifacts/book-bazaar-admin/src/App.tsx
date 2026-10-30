@@ -1,10 +1,10 @@
-import { type FormEvent, type ReactNode, useEffect, useMemo, useState } from 'react';
+import { type FormEvent, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { Link, Route, Switch, useLocation, Router as WouterRouter } from 'wouter';
-import { LayoutDashboard, Truck, Building2, UsersRound, BookOpen, Tags, Boxes, Search, Plus, Pencil, Trash2, ArrowUpRight, ArrowRight, Menu, X, Bell, TriangleAlert, PackageCheck, Library, Check, Minus, Save, CalendarDays, PlusCircle, Users2, FileOutput, FileText, ArrowDownLeft, RotateCcw, ClipboardList, FilePen, ShoppingBag, Package, Smartphone, Wallet, ChevronDown, FileInput, ArrowUpLeft, RotateCw, ClipboardCheck, RefreshCcw } from 'lucide-react';
+import { LayoutDashboard, Truck, Building2, UsersRound, BookOpen, Tags, Boxes, Search, Plus, Pencil, Trash2, ArrowUpRight, ArrowRight, Menu, X, Bell, TriangleAlert, PackageCheck, Library, Check, Minus, Save, CalendarDays, PlusCircle, Users2, FileOutput, FileText, ArrowDownLeft, RotateCcw, ClipboardList, FilePen, ShoppingBag, Package, Smartphone, Wallet, ChevronDown, FileInput, ArrowUpLeft, RotateCw, ClipboardCheck, RefreshCcw, Download, Share2, Eye, Printer, ChevronLeft } from 'lucide-react';
 import NotFound from '@/pages/not-found';
 
 type Customer = { id:string; name:string; email:string; phone:string; school:string; className:string; status:'Active'|'Pending'|'Inactive'; allowedPublications:string[]; allowedBooks?:string[]; joinedAt:string; amountPaid?:number; amountDue?:number };
@@ -70,6 +70,420 @@ const RETURN_SUB = [
   {to:'/return/sale',     label:'Sale Return',     Icon:RotateCcw, note:'Credit Note'},
   {to:'/return/purchase', label:'Purchase Return', Icon:RotateCw,  note:''},
 ];
+// ─────────────────────── Number to Words ─────────────────────────────────────
+function numberToWords(n: number): string {
+  if (n === 0) return 'Zero';
+  const ones = ['','One','Two','Three','Four','Five','Six','Seven','Eight','Nine','Ten','Eleven','Twelve','Thirteen','Fourteen','Fifteen','Sixteen','Seventeen','Eighteen','Nineteen'];
+  const tens = ['','','Twenty','Thirty','Forty','Fifty','Sixty','Seventy','Eighty','Ninety'];
+  function below1000(num: number): string {
+    if (num === 0) return '';
+    if (num < 20) return ones[num] + ' ';
+    if (num < 100) return tens[Math.floor(num/10)] + (num%10 ? ' ' + ones[num%10] : '') + ' ';
+    return ones[Math.floor(num/100)] + ' Hundred ' + below1000(num%100);
+  }
+  const absN = Math.round(Math.abs(n));
+  let result = '';
+  if (absN >= 10000000) { result += below1000(Math.floor(absN/10000000)) + 'Crore '; }
+  if (absN >= 100000) { result += below1000(Math.floor((absN%10000000)/100000)) + 'Lakh '; }
+  if (absN >= 1000) { result += below1000(Math.floor((absN%100000)/1000)) + 'Thousand '; }
+  result += below1000(absN%1000);
+  return result.trim() + ' Rupees Only';
+}
+
+// ─────────────────────── Digital Invoice Component ───────────────────────────
+const STORE_NAME = 'Book Bazaar';
+const STORE_TAGLINE = 'Every title, in good hands.';
+
+function DigitalInvoice({ inv, onClose, onEdit }: { inv: SaleInvoiceType; onClose: () => void; onEdit: () => void }) {
+  const [showPreview, setShowPreview] = useState(false);
+  const invoiceRef = useRef<HTMLDivElement>(null);
+  const total = calcInvoiceTotal(inv);
+  const balDue = Math.max(0, total - inv.received);
+  const amtWords = numberToWords(total);
+
+  const handlePrint = () => {
+    // Temporarily show preview to allow printing the invoice content
+    const printContent = invoiceRef.current;
+    if (!printContent) return;
+    const win = window.open('', '_blank', 'width=900,height=700');
+    if (!win) { window.print(); return; }
+    win.document.write(`
+      <html><head><title>Invoice ${inv.invoiceNo}</title>
+      <style>
+        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@500;600;700&display=swap');
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'DM Sans', sans-serif; background: #fff; color: #1a1a1a; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        @media print { @page { margin: 0; size: A4; } body { padding: 0; } }
+      </style></head><body>
+      ${printContent.outerHTML}
+      <script>window.onload=()=>{ window.print(); setTimeout(()=>window.close(),800); }<\/script>
+      </body></html>
+    `);
+    win.document.close();
+  };
+
+  const handleShare = async () => {
+    const text = `Invoice ${inv.invoiceNo}\nCustomer: ${inv.customerName}\nDate: ${inv.date}\nTotal: ${money(total)}\nBalance Due: ${money(balDue)}\n\nThank you for your business!\n— ${STORE_NAME}`;
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: `Invoice ${inv.invoiceNo} – ${STORE_NAME}`, text });
+        return;
+      } catch {}
+    }
+    // Fallback: copy to clipboard
+    try {
+      await navigator.clipboard.writeText(text);
+      alert('Invoice details copied to clipboard!');
+    } catch {
+      alert(text);
+    }
+  };
+
+  return (
+    <div style={{ minHeight: '100vh', background: '#f2f0e8', display: 'flex', flexDirection: 'column' }}>
+      {/* Header */}
+      <div style={{ background: '#fff', borderBottom: '1px solid #e7e2d6', padding: '14px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 20, boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <button onClick={onClose} style={{ background: 'none', border: '1px solid #e2ded2', borderRadius: 8, cursor: 'pointer', padding: '6px 8px', display: 'flex', alignItems: 'center', color: '#536157' }}>
+            <ChevronLeft size={18} />
+          </button>
+          <div>
+            <div style={{ fontFamily: 'var(--app-font-serif)', fontSize: 18, fontWeight: 700, color: '#1e3d2c' }}>Invoice {inv.invoiceNo}</div>
+            <div style={{ fontSize: 11, color: '#8a9389', marginTop: 1 }}>{inv.customerName} · {inv.date}</div>
+          </div>
+        </div>
+        <button onClick={onEdit} className="btn" style={{ fontSize: 12 }}>
+          <Pencil size={14} /> Edit
+        </button>
+      </div>
+
+      {/* Invoice Paper */}
+      <div style={{ flex: 1, padding: '24px 20px 100px', display: 'flex', justifyContent: 'center' }}>
+        <div ref={invoiceRef} id="digital-invoice-print" style={{ width: '100%', maxWidth: 680, background: '#fff', borderRadius: 14, border: '1px solid #e7e2d4', boxShadow: '0 4px 24px rgba(30,61,44,0.10)', overflow: 'hidden' }}>
+          {/* Invoice Header */}
+          <div style={{ background: 'linear-gradient(135deg, #1e3d2c 0%, #2a5240 100%)', color: '#fff', padding: '24px 28px 20px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+              <div>
+                <div style={{ fontFamily: 'var(--app-font-serif)', fontSize: 26, fontWeight: 700, letterSpacing: '-0.5px', marginBottom: 4 }}>{STORE_NAME}</div>
+                <div style={{ fontSize: 11, opacity: 0.75, letterSpacing: '0.5px' }}>{STORE_TAGLINE}</div>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ background: 'rgba(255,255,255,0.15)', borderRadius: 8, padding: '6px 14px', display: 'inline-block' }}>
+                  <div style={{ fontSize: 9, letterSpacing: '1.5px', textTransform: 'uppercase', opacity: 0.8, marginBottom: 2 }}>Tax Invoice</div>
+                  <div style={{ fontFamily: 'var(--app-font-serif)', fontSize: 17, fontWeight: 700 }}>{inv.invoiceNo}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Bill To + Invoice Details */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 0, borderBottom: '1px solid #eee9df' }}>
+            <div style={{ padding: '18px 24px', borderRight: '1px solid #eee9df' }}>
+              <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '1.2px', color: '#a9663b', textTransform: 'uppercase', marginBottom: 8 }}>Bill To</div>
+              <div style={{ fontWeight: 700, fontSize: 14, color: '#1e3d2c', marginBottom: 3 }}>{inv.billingName || inv.customerName || '—'}</div>
+              {inv.phone && <div style={{ fontSize: 12, color: '#536157' }}>Contact: {inv.phone}</div>}
+              {inv.partyBalance > 0 && <div style={{ fontSize: 11, color: '#a9663b', marginTop: 4 }}>Previous Balance: {money(inv.partyBalance)}</div>}
+            </div>
+            <div style={{ padding: '18px 24px' }}>
+              <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '1.2px', color: '#a9663b', textTransform: 'uppercase', marginBottom: 8 }}>Invoice Details</div>
+              <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse' }}>
+                <tbody>
+                  {[
+                    ['Invoice No.', inv.invoiceNo],
+                    ['Date', inv.date],
+                    ['Time', inv.time],
+                    ['Payment Mode', inv.paymentType],
+                    inv.paymentRef ? ['Ref No.', inv.paymentRef] : null,
+                  ].filter((r): r is string[] => r !== null).map(([label, val], i) => (
+                    <tr key={i}>
+                      <td style={{ color: '#8a9389', paddingBottom: 4, paddingRight: 12, whiteSpace: 'nowrap' }}>{label}</td>
+                      <td style={{ color: '#2b4435', fontWeight: 600, paddingBottom: 4 }}>{val as string}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Items Table */}
+          <div style={{ padding: '0' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr style={{ background: '#f4f1e8' }}>
+                  <th style={{ padding: '10px 18px', fontSize: 9, fontWeight: 700, letterSpacing: '0.8px', textTransform: 'uppercase', color: '#8a9187', textAlign: 'left', borderBottom: '1px solid #e9e4d9' }}>#</th>
+                  <th style={{ padding: '10px 12px', fontSize: 9, fontWeight: 700, letterSpacing: '0.8px', textTransform: 'uppercase', color: '#8a9187', textAlign: 'left', borderBottom: '1px solid #e9e4d9' }}>Book Name</th>
+                  <th style={{ padding: '10px 12px', fontSize: 9, fontWeight: 700, letterSpacing: '0.8px', textTransform: 'uppercase', color: '#8a9187', textAlign: 'center', borderBottom: '1px solid #e9e4d9' }}>Qty</th>
+                  <th style={{ padding: '10px 12px', fontSize: 9, fontWeight: 700, letterSpacing: '0.8px', textTransform: 'uppercase', color: '#8a9187', textAlign: 'right', borderBottom: '1px solid #e9e4d9' }}>Price</th>
+                  <th style={{ padding: '10px 12px', fontSize: 9, fontWeight: 700, letterSpacing: '0.8px', textTransform: 'uppercase', color: '#8a9187', textAlign: 'center', borderBottom: '1px solid #e9e4d9' }}>Disc %</th>
+                  <th style={{ padding: '10px 18px 10px 12px', fontSize: 9, fontWeight: 700, letterSpacing: '0.8px', textTransform: 'uppercase', color: '#8a9187', textAlign: 'right', borderBottom: '1px solid #e9e4d9' }}>Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                {inv.items.map((item, i) => {
+                  const amt = item.qty * item.price * (1 - item.discountPct / 100);
+                  return (
+                    <tr key={item.id} style={{ background: i % 2 === 0 ? '#fff' : '#faf9f4' }}>
+                      <td style={{ padding: '11px 18px', fontSize: 12, color: '#8a9389', borderBottom: '1px solid #f0ebe0' }}>{i + 1}</td>
+                      <td style={{ padding: '11px 12px', borderBottom: '1px solid #f0ebe0' }}>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: '#1e3d2c' }}>{item.name}</div>
+                        {item.bookId && <div style={{ fontSize: 10, color: '#8a9389', marginTop: 2 }}>ID: {item.bookId}</div>}
+                      </td>
+                      <td style={{ padding: '11px 12px', fontSize: 12, color: '#536157', textAlign: 'center', borderBottom: '1px solid #f0ebe0' }}>{item.qty}</td>
+                      <td style={{ padding: '11px 12px', fontSize: 12, color: '#536157', textAlign: 'right', borderBottom: '1px solid #f0ebe0' }}>{money(item.price)}</td>
+                      <td style={{ padding: '11px 12px', fontSize: 12, color: item.discountPct > 0 ? '#a9663b' : '#8a9389', textAlign: 'center', borderBottom: '1px solid #f0ebe0' }}>{item.discountPct > 0 ? `${item.discountPct}%` : '—'}</td>
+                      <td style={{ padding: '11px 18px 11px 12px', fontSize: 13, fontWeight: 700, color: '#1e3d2c', textAlign: 'right', borderBottom: '1px solid #f0ebe0' }}>{money(amt)}</td>
+                    </tr>
+                  );
+                })}
+                {inv.items.length === 0 && (
+                  <tr><td colSpan={6} style={{ padding: '24px', textAlign: 'center', color: '#8a9389', fontSize: 12 }}>No items</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Totals + Amount in Words */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 0, borderTop: '2px solid #e9e4d9' }}>
+            {/* Amount in words + notes */}
+            <div style={{ padding: '18px 24px', borderRight: '1px solid #eee9df' }}>
+              <div style={{ fontSize: 9, fontWeight: 700, color: '#8a9389', letterSpacing: '1px', textTransform: 'uppercase', marginBottom: 6 }}>Invoice Amount in Words</div>
+              <div style={{ fontSize: 12, fontWeight: 600, color: '#2b4435', fontStyle: 'italic', marginBottom: 14 }}>{amtWords}</div>
+              {inv.notes && (
+                <>
+                  <div style={{ fontSize: 9, fontWeight: 700, color: '#8a9389', letterSpacing: '1px', textTransform: 'uppercase', marginBottom: 4 }}>Note</div>
+                  <div style={{ fontSize: 11, color: '#536157', whiteSpace: 'pre-line' }}>{inv.notes}</div>
+                </>
+              )}
+            </div>
+            {/* Totals */}
+            <div style={{ padding: '18px 24px', minWidth: 220 }}>
+              {(() => {
+                const itemsSub = inv.items.reduce((s, i) => s + i.qty * i.price * (1 - i.discountPct / 100), 0);
+                const discAmt = itemsSub * inv.discountPct / 100;
+                const rows: [string, string, string?][] = [];
+                rows.push(['Subtotal', money(itemsSub)]);
+                if (inv.discountPct > 0) rows.push(['Discount (' + inv.discountPct + '%)', '−' + money(discAmt), 'red']);
+                if (inv.shipping > 0) rows.push(['Shipping', money(inv.shipping)]);
+                if (inv.roundOff) rows.push(['Round Off', `₹ ${(Math.round(itemsSub * (1 - inv.discountPct / 100) + inv.shipping) - (itemsSub * (1 - inv.discountPct / 100) + inv.shipping)).toFixed(2)}`]);
+                return rows.map(([label, val, tint], i) => (
+                  <div key={i} style={{ display: 'flex', justifyContent: 'space-between', gap: 24, fontSize: 12, color: tint === 'red' ? '#a24840' : '#536157', paddingBottom: 8, marginBottom: 8, borderBottom: '1px dashed #eee9df' }}>
+                    <span>{label}</span><span style={{ fontWeight: 500 }}>{val}</span>
+                  </div>
+                ));
+              })()}
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 24, fontSize: 16, fontWeight: 800, color: '#1e3d2c', paddingBottom: 8, marginBottom: 8, borderBottom: '2px solid #1e3d2c' }}>
+                <span>Total</span><span>{money(total)}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 24, fontSize: 12, color: '#3a6647', paddingBottom: 6 }}>
+                <span>Received</span><span style={{ fontWeight: 600 }}>{money(inv.received)}</span>
+              </div>
+              {inv.paymentType && (
+                <div style={{ fontSize: 10, color: '#8a9389', marginBottom: 6 }}>via {inv.paymentType}{inv.paymentRef ? ` · ${inv.paymentRef}` : ''}</div>
+              )}
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 24, fontSize: 14, fontWeight: 700, color: balDue > 0 ? '#a24840' : '#3a6647', paddingTop: 6, borderTop: '1px solid #eee9df' }}>
+                <span>Balance Due</span><span>{money(balDue)}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Terms */}
+          {inv.terms && (
+            <div style={{ padding: '14px 24px', borderTop: '1px solid #eee9df', background: '#faf9f4' }}>
+              <div style={{ fontSize: 9, fontWeight: 700, color: '#8a9389', letterSpacing: '1px', textTransform: 'uppercase', marginBottom: 6 }}>Terms & Conditions</div>
+              <div style={{ fontSize: 10, color: '#8a9389', whiteSpace: 'pre-line', lineHeight: 1.7 }}>{inv.terms}</div>
+            </div>
+          )}
+
+          {/* Footer */}
+          <div style={{ background: 'linear-gradient(135deg, #1e3d2c 0%, #2a5240 100%)', padding: '16px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              <div style={{ fontFamily: 'var(--app-font-serif)', fontSize: 13, fontWeight: 700, color: '#fff', marginBottom: 2 }}>{STORE_NAME}</div>
+              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.6)' }}>{STORE_TAGLINE}</div>
+            </div>
+            <div style={{ textAlign: 'right' }}>
+              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.65)', marginBottom: 4 }}>Authorised Signatory</div>
+              <div style={{ width: 90, borderTop: '1px solid rgba(255,255,255,0.4)', paddingTop: 4, fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>Signature</div>
+            </div>
+          </div>
+
+          {/* Acknowledgement strip */}
+          <div style={{ background: '#f4f1e6', borderTop: '1px dashed #d9d3c0', padding: '12px 24px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <div>
+              <div style={{ fontSize: 9, fontWeight: 700, color: '#8a9389', letterSpacing: '1px', textTransform: 'uppercase', marginBottom: 4 }}>Acknowledgement</div>
+              <div style={{ fontSize: 11, fontWeight: 600, color: '#2b4435' }}>{STORE_NAME}</div>
+              <div style={{ fontSize: 11, color: '#536157', marginTop: 2 }}>Invoice To: {inv.customerName}</div>
+            </div>
+            <div style={{ textAlign: 'right', fontSize: 11, color: '#536157' }}>
+              <div>Invoice No.: <b style={{ color: '#2b4435' }}>{inv.invoiceNo}</b></div>
+              <div style={{ marginTop: 2 }}>Date: <b style={{ color: '#2b4435' }}>{inv.date}</b></div>
+              <div style={{ marginTop: 2 }}>Amount: <b style={{ color: '#2b4435' }}>{money(total)}</b></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Sticky Action Bar */}
+      <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 30, background: '#fff', borderTop: '1px solid #e7e2d6', padding: '14px 20px', display: 'flex', gap: 10, justifyContent: 'center', boxShadow: '0 -4px 18px rgba(30,61,44,0.10)' }}>
+        <button
+          onClick={() => setShowPreview(true)}
+          className="btn"
+          style={{ flex: 1, maxWidth: 180, fontSize: 13, padding: '11px 16px', gap: 8 }}
+        >
+          <Eye size={16} /> Preview
+        </button>
+        <button
+          onClick={handlePrint}
+          className="btn primary"
+          style={{ flex: 1, maxWidth: 180, fontSize: 13, padding: '11px 16px', gap: 8 }}
+        >
+          <Download size={16} /> Save PDF
+        </button>
+        <button
+          onClick={handleShare}
+          className="btn"
+          style={{ flex: 1, maxWidth: 180, fontSize: 13, padding: '11px 16px', gap: 8, background: '#2a5240', color: '#fff', border: '1px solid #2a5240' }}
+        >
+          <Share2 size={16} /> Share
+        </button>
+      </div>
+
+      {/* Preview Modal */}
+      {showPreview && (
+        <InvoicePreviewModal inv={inv} onClose={() => setShowPreview(false)} onPrint={handlePrint} onShare={handleShare} />
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────── Invoice Preview Modal ───────────────────────────────
+function InvoicePreviewModal({ inv, onClose, onPrint, onShare }: { inv: SaleInvoiceType; onClose: () => void; onPrint: () => void; onShare: () => void }) {
+  const total = calcInvoiceTotal(inv);
+  const balDue = Math.max(0, total - inv.received);
+  const amtWords = numberToWords(total);
+  return (
+    <div
+      style={{ position: 'fixed', inset: 0, zIndex: 50, background: 'rgba(10,26,18,0.80)', display: 'flex', flexDirection: 'column', animation: 'fade .16s ease' }}
+      onMouseDown={e => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      {/* Modal header */}
+      <div style={{ background: '#1e3d2c', color: '#fff', padding: '14px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+        <div style={{ fontFamily: 'var(--app-font-serif)', fontSize: 16, fontWeight: 700 }}>Invoice Preview · {inv.invoiceNo}</div>
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+          <button onClick={onPrint} style={{ background: 'rgba(255,255,255,0.18)', border: '1px solid rgba(255,255,255,0.25)', borderRadius: 7, padding: '7px 14px', color: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
+            <Printer size={14} /> Print / Save PDF
+          </button>
+          <button onClick={onShare} style={{ background: 'rgba(255,255,255,0.18)', border: '1px solid rgba(255,255,255,0.25)', borderRadius: 7, padding: '7px 14px', color: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
+            <Share2 size={14} /> Share
+          </button>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.7)', display: 'flex', alignItems: 'center', padding: 4 }}>
+            <X size={20} />
+          </button>
+        </div>
+      </div>
+      {/* Scrollable preview area */}
+      <div style={{ flex: 1, overflow: 'auto', padding: '24px 20px 32px', display: 'flex', justifyContent: 'center' }}>
+        <div style={{ width: '100%', maxWidth: 680, background: '#fff', borderRadius: 12, border: '1px solid #e7e2d4', boxShadow: '0 8px 40px rgba(0,0,0,0.25)', overflow: 'hidden' }}>
+          {/* Same invoice layout as DigitalInvoice for preview */}
+          <div style={{ background: 'linear-gradient(135deg, #1e3d2c 0%, #2a5240 100%)', color: '#fff', padding: '24px 28px 20px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+              <div>
+                <div style={{ fontFamily: 'var(--app-font-serif)', fontSize: 26, fontWeight: 700, letterSpacing: '-0.5px', marginBottom: 4 }}>{STORE_NAME}</div>
+                <div style={{ fontSize: 11, opacity: 0.75, letterSpacing: '0.5px' }}>{STORE_TAGLINE}</div>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ background: 'rgba(255,255,255,0.15)', borderRadius: 8, padding: '6px 14px', display: 'inline-block' }}>
+                  <div style={{ fontSize: 9, letterSpacing: '1.5px', textTransform: 'uppercase', opacity: 0.8, marginBottom: 2 }}>Tax Invoice</div>
+                  <div style={{ fontFamily: 'var(--app-font-serif)', fontSize: 17, fontWeight: 700 }}>{inv.invoiceNo}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', borderBottom: '1px solid #eee9df' }}>
+            <div style={{ padding: '18px 24px', borderRight: '1px solid #eee9df' }}>
+              <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '1.2px', color: '#a9663b', textTransform: 'uppercase', marginBottom: 8 }}>Bill To</div>
+              <div style={{ fontWeight: 700, fontSize: 14, color: '#1e3d2c', marginBottom: 3 }}>{inv.billingName || inv.customerName || '—'}</div>
+              {inv.phone && <div style={{ fontSize: 12, color: '#536157' }}>Contact: {inv.phone}</div>}
+            </div>
+            <div style={{ padding: '18px 24px' }}>
+              <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '1.2px', color: '#a9663b', textTransform: 'uppercase', marginBottom: 8 }}>Invoice Details</div>
+              <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse' }}>
+                <tbody>
+                  {[['Invoice No.', inv.invoiceNo], ['Date', inv.date], ['Time', inv.time], ['Payment Mode', inv.paymentType]].map(([l, v], i) => (
+                    <tr key={i}><td style={{ color: '#8a9389', paddingBottom: 4, paddingRight: 12 }}>{l}</td><td style={{ color: '#2b4435', fontWeight: 600, paddingBottom: 4 }}>{v}</td></tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr style={{ background: '#f4f1e8' }}>
+                {['#', 'Book Name', 'Qty', 'Price', 'Disc %', 'Amount'].map((h, i) => (
+                  <th key={i} style={{ padding: '10px 12px', fontSize: 9, fontWeight: 700, letterSpacing: '0.8px', textTransform: 'uppercase', color: '#8a9187', textAlign: i === 0 ? 'left' : i === 5 ? 'right' : i === 1 ? 'left' : 'center', borderBottom: '1px solid #e9e4d9', paddingLeft: i === 0 ? 18 : 12, paddingRight: i === 5 ? 18 : 12 }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {inv.items.map((item, i) => {
+                const amt = item.qty * item.price * (1 - item.discountPct / 100);
+                return (
+                  <tr key={item.id} style={{ background: i % 2 === 0 ? '#fff' : '#faf9f4' }}>
+                    <td style={{ padding: '11px 18px', fontSize: 12, color: '#8a9389', borderBottom: '1px solid #f0ebe0' }}>{i + 1}</td>
+                    <td style={{ padding: '11px 12px', borderBottom: '1px solid #f0ebe0' }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: '#1e3d2c' }}>{item.name}</div>
+                    </td>
+                    <td style={{ padding: '11px 12px', fontSize: 12, textAlign: 'center', borderBottom: '1px solid #f0ebe0', color: '#536157' }}>{item.qty}</td>
+                    <td style={{ padding: '11px 12px', fontSize: 12, textAlign: 'right', borderBottom: '1px solid #f0ebe0', color: '#536157' }}>{money(item.price)}</td>
+                    <td style={{ padding: '11px 12px', fontSize: 12, textAlign: 'center', borderBottom: '1px solid #f0ebe0', color: item.discountPct > 0 ? '#a9663b' : '#8a9389' }}>{item.discountPct > 0 ? `${item.discountPct}%` : '—'}</td>
+                    <td style={{ padding: '11px 18px 11px 12px', fontSize: 13, fontWeight: 700, color: '#1e3d2c', textAlign: 'right', borderBottom: '1px solid #f0ebe0' }}>{money(amt)}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', borderTop: '2px solid #e9e4d9' }}>
+            <div style={{ padding: '18px 24px', borderRight: '1px solid #eee9df' }}>
+              <div style={{ fontSize: 9, fontWeight: 700, color: '#8a9389', letterSpacing: '1px', textTransform: 'uppercase', marginBottom: 6 }}>Amount in Words</div>
+              <div style={{ fontSize: 12, fontWeight: 600, color: '#2b4435', fontStyle: 'italic' }}>{amtWords}</div>
+            </div>
+            <div style={{ padding: '18px 24px', minWidth: 220 }}>
+              {(() => {
+                const itemsSub = inv.items.reduce((s, i) => s + i.qty * i.price * (1 - i.discountPct / 100), 0);
+                return (
+                  <>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#536157', paddingBottom: 6 }}><span>Subtotal</span><span>{money(itemsSub)}</span></div>
+                    {inv.discountPct > 0 && <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#a9663b', paddingBottom: 6 }}><span>Discount ({inv.discountPct}%)</span><span>−{money(itemsSub * inv.discountPct / 100)}</span></div>}
+                    {inv.shipping > 0 && <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#536157', paddingBottom: 6 }}><span>Shipping</span><span>{money(inv.shipping)}</span></div>}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 16, fontWeight: 800, color: '#1e3d2c', paddingBottom: 8, borderBottom: '2px solid #1e3d2c', marginBottom: 8, marginTop: 4 }}><span>Total</span><span>{money(total)}</span></div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#3a6647', paddingBottom: 4 }}><span>Received</span><span style={{ fontWeight: 600 }}>{money(inv.received)}</span></div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, fontWeight: 700, color: balDue > 0 ? '#a24840' : '#3a6647', paddingTop: 6, borderTop: '1px solid #eee9df' }}><span>Balance Due</span><span>{money(balDue)}</span></div>
+                  </>
+                );
+              })()}
+            </div>
+          </div>
+          {inv.terms && (
+            <div style={{ padding: '14px 24px', borderTop: '1px solid #eee9df', background: '#faf9f4' }}>
+              <div style={{ fontSize: 9, fontWeight: 700, color: '#8a9389', letterSpacing: '1px', textTransform: 'uppercase', marginBottom: 6 }}>Terms & Conditions</div>
+              <div style={{ fontSize: 10, color: '#8a9389', whiteSpace: 'pre-line', lineHeight: 1.7 }}>{inv.terms}</div>
+            </div>
+          )}
+          <div style={{ background: 'linear-gradient(135deg, #1e3d2c 0%, #2a5240 100%)', padding: '16px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              <div style={{ fontFamily: 'var(--app-font-serif)', fontSize: 13, fontWeight: 700, color: '#fff', marginBottom: 2 }}>{STORE_NAME}</div>
+              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.6)' }}>{STORE_TAGLINE}</div>
+            </div>
+            <div style={{ textAlign: 'right' }}>
+              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.65)', marginBottom: 4 }}>Authorised Signatory</div>
+              <div style={{ width: 90, borderTop: '1px solid rgba(255,255,255,0.4)', paddingTop: 4, fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>Signature</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─────────────────────── Sale Invoice Types & Components ─────────────────────
 const INVOICE_KEY='bookbazaar-invoices-v1';
 type InvoiceItem={id:string;bookId:string;name:string;qty:number;price:number;discountPct:number};
@@ -77,16 +491,23 @@ type SaleInvoiceType={id:string;invoiceNo:string;date:string;time:string;custome
 function calcInvoiceTotal(inv:SaleInvoiceType){const sub=inv.items.reduce((s,i)=>s+i.qty*i.price*(1-i.discountPct/100),0);const aft=sub*(1-inv.discountPct/100)+inv.shipping;return inv.roundOff?Math.round(aft):aft;}
 function SaleInvoicePage(c:Context){
   const [invoices,setInvoices]=useState<SaleInvoiceType[]>(()=>{try{const v=localStorage.getItem(INVOICE_KEY);return v?JSON.parse(v):[];}catch{return [];}});
-  const [view,setView]=useState<'list'|'form'>('list');
+  const [view,setView]=useState<'list'|'form'|'digital-invoice'>('list');
   const [editing,setEditing]=useState<SaleInvoiceType|null>(null);
+  const [activeInvoice,setActiveInvoice]=useState<SaleInvoiceType|null>(null);
   useEffect(()=>{localStorage.setItem(INVOICE_KEY,JSON.stringify(invoices));},[invoices]);
   const nowTime=()=>new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',hour12:true});
   const nextNo=()=>`BB-${String(invoices.length+1).padStart(4,'0')}`;
   const openNew=()=>{setEditing(null);setView('form');};
   const openEdit=(inv:SaleInvoiceType)=>{setEditing(inv);setView('form');};
   const closeForm=()=>{setView('list');setEditing(null);};
-  const saveInvoice=(inv:SaleInvoiceType)=>{setInvoices(prev=>editing?prev.map(x=>x.id===inv.id?inv:x):[inv,...prev]);closeForm();};
+  const saveInvoice=(inv:SaleInvoiceType)=>{
+    setInvoices(prev=>editing?prev.map(x=>x.id===inv.id?inv:x):[inv,...prev]);
+    setActiveInvoice(inv);
+    setEditing(null);
+    setView('digital-invoice');
+  };
   const delInvoice=(id:string)=>setInvoices(prev=>prev.filter(x=>x.id!==id));
+  if(view==='digital-invoice'&&activeInvoice)return <DigitalInvoice inv={activeInvoice} onClose={()=>setView('list')} onEdit={()=>{setEditing(activeInvoice);setView('form');}}/>;
   if(view==='form')return <InvoiceForm data={c.data} initial={editing} nextNo={nextNo()} nowTime={nowTime()} onSave={saveInvoice} onClose={closeForm} onDelete={editing?()=>{delInvoice(editing.id);closeForm();}:undefined}/>;
   return(
     <main className="page">
@@ -110,7 +531,7 @@ function SaleInvoicePage(c:Context){
               <td style={{color:'#3a6647'}}>{money(inv.received)}</td>
               <td style={{color:bal>0?'#a24840':'#3a6647',fontWeight:600}}>{money(Math.max(0,bal))}</td>
               <td><Pill state={st}>{st}</Pill></td>
-              <td><div className="row-actions"><button className="icon-button" title="Edit" onClick={()=>openEdit(inv)}><Pencil/></button><button className="icon-button" title="Delete" onClick={()=>delInvoice(inv.id)}><Trash2/></button></div></td>
+              <td><div className="row-actions"><button className="icon-button" title="View Invoice" onClick={()=>{setActiveInvoice(inv);setView('digital-invoice');}}><Eye size={14}/></button><button className="icon-button" title="Edit" onClick={()=>openEdit(inv)}><Pencil/></button><button className="icon-button" title="Delete" onClick={()=>delInvoice(inv.id)}><Trash2/></button></div></td>
             </tr>
           );})}</tbody>
         </table>
