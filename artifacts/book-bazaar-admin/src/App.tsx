@@ -2037,6 +2037,549 @@ function ProformaInvoiceForm({data,initial,nextRefNo,nowTime,onSave,onClose,onDe
 function ComingSoon({title,sub,Icon}:{title:string;sub:string;Icon:any}){
   return <main className="page"><div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',minHeight:'55vh',textAlign:'center',gap:14}}><div style={{width:60,height:60,borderRadius:18,background:'#e8f0e6',display:'grid',placeItems:'center',color:'#3d6b4a'}}><Icon size={26}/></div><h1 style={{fontFamily:'var(--app-font-serif)',fontSize:'clamp(22px,3vw,30px)',color:'#1e3d2c',margin:0}}>{title}</h1><p style={{fontSize:13,color:'#6d7d6e',maxWidth:380,margin:0,lineHeight:1.6}}>{sub}</p><span style={{fontSize:11,color:'#9aaa99',background:'#f0ede4',padding:'6px 14px',borderRadius:20,fontWeight:600}}>Coming soon</span></div></main>;
 }
+
+// ─────────────────────────────── Parties Section ─────────────────────────────// ─────────────────────────────── Parties Section ─────────────────────────────
+const PARTIES_KEY = 'bookbazaar-parties-v1';
+
+type PartyTransaction = {
+  id: string;
+  type: 'Purchase' | 'Payment-Out' | 'Debit Note' | 'Party To Party';
+  billNo: string;
+  date: string;
+  time: string;
+  partyName: string;
+  billingName: string;
+  phone: string;
+  items: { id: string; name: string; qty: number; price: number; discountPct: number }[];
+  total: number;
+  received: number;
+  status: 'Paid' | 'Partial' | 'Unpaid';
+  notes: string;
+};
+
+type Party = {
+  id: string;
+  name: string;
+  phone: string;
+  billingName: string;
+  lastDate: string;
+  transactions: PartyTransaction[];
+};
+
+function readParties(): Party[] {
+  try { const v = localStorage.getItem(PARTIES_KEY); return v ? JSON.parse(v) : []; } catch { return []; }
+}
+
+function savePartiesStore(pts: Party[]) {
+  localStorage.setItem(PARTIES_KEY, JSON.stringify(pts));
+}
+
+function calcTxBalance(tx: PartyTransaction) { return Math.max(0, tx.total - tx.received); }
+
+// ── Party Bill Detail ──────────────────────────────────────────────────────
+function PartyBillDetail({ tx, onBack, onEdit, onDelete }: { tx: PartyTransaction; onBack: () => void; onEdit: () => void; onDelete: () => void }) {
+  return (
+    <main style={{ minHeight: '100vh', background: '#f5f5f5', display: 'flex', flexDirection: 'column', maxWidth: 560, margin: '0 auto' }}>
+      <div style={{ background: '#fff', borderBottom: '1px solid #e8e8e8', padding: '14px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 10 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <button onClick={onBack} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, display: 'flex', alignItems: 'center', color: '#333' }}><ChevronLeft size={22} /></button>
+          <h1 style={{ fontSize: 18, fontWeight: 700, color: '#1a1a1a', margin: 0 }}>{tx.type}</h1>
+        </div>
+        <button onClick={onEdit} style={{ background: 'none', border: '1px solid #e2ded2', borderRadius: 7, cursor: 'pointer', padding: '6px 12px', fontSize: 12, fontWeight: 600, color: '#315a41', display: 'flex', alignItems: 'center', gap: 5 }}><Pencil size={13} /> Edit</button>
+      </div>
+
+      <div style={{ background: '#fff', borderBottom: '1px solid #eee', padding: '12px 16px', display: 'grid', gridTemplateColumns: '1fr 1px 1fr 1px 1fr' }}>
+        <div style={{ paddingRight: 12 }}><div style={{ fontSize: 10, color: '#999', marginBottom: 2 }}>Bill No.</div><div style={{ fontSize: 15, fontWeight: 700, color: '#1a1a1a' }}>{tx.billNo}</div></div>
+        <div style={{ background: '#e0e0e0' }} />
+        <div style={{ padding: '0 12px' }}><div style={{ fontSize: 10, color: '#999', marginBottom: 2 }}>Date</div><div style={{ fontSize: 14, fontWeight: 500, color: '#1a1a1a' }}>{tx.date}</div></div>
+        <div style={{ background: '#e0e0e0' }} />
+        <div style={{ paddingLeft: 12 }}><div style={{ fontSize: 10, color: '#999', marginBottom: 2 }}>Time</div><div style={{ fontSize: 14, fontWeight: 500, color: '#1a1a1a' }}>{tx.time}</div></div>
+      </div>
+
+      <div style={{ background: '#fff', marginTop: 8, padding: '4px 16px 4px' }}>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', fontSize: 11, color: '#a24840', fontWeight: 600, marginBottom: 4 }}>Party Balance: {money(calcTxBalance(tx))}</div>
+        <div style={{ position: 'relative', border: '2px solid #1976d2', borderRadius: 6, padding: '16px 12px 8px', marginBottom: 10 }}>
+          <label style={{ position: 'absolute', top: -10, left: 10, background: '#fff', padding: '0 4px', fontSize: 12, color: '#1976d2', fontWeight: 500 }}>Party Name *</label>
+          <div style={{ fontSize: 15, color: '#1a1a1a', fontWeight: 500 }}>{tx.partyName}</div>
+        </div>
+        <div style={{ position: 'relative', border: '1px solid #ccc', borderRadius: 6, padding: '16px 12px 8px', marginBottom: 10 }}>
+          <label style={{ position: 'absolute', top: -10, left: 10, background: '#fff', padding: '0 4px', fontSize: 12, color: '#888', fontWeight: 500 }}>Billing Name (Optional)</label>
+          <div style={{ fontSize: 15, color: '#1a1a1a' }}>{tx.billingName || tx.partyName}</div>
+        </div>
+        <div style={{ border: '1px solid #ccc', borderRadius: 6, padding: '14px 12px', marginBottom: 10 }}>
+          <div style={{ fontSize: 15, color: tx.phone ? '#1a1a1a' : '#aaa' }}>{tx.phone || 'Phone Number'}</div>
+        </div>
+      </div>
+
+      <div style={{ background: '#fff', marginTop: 8 }}>
+        <div style={{ background: '#4a90d9', padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 8, color: '#fff', fontWeight: 600, fontSize: 13 }}>
+          <BookOpen size={15} /> Billed Items ({tx.items.length})
+        </div>
+        <div style={{ padding: '12px 16px' }}>
+          {tx.items.length === 0 && <div style={{ textAlign: 'center', padding: '24px', color: '#8a9389', fontSize: 13 }}>No items on this bill.</div>}
+          {tx.items.map((item, i) => {
+            const lineTotal = item.qty * item.price * (1 - item.discountPct / 100);
+            return (
+              <div key={item.id} style={{ border: '1px solid #e7e1d4', borderRadius: 9, padding: 13, marginBottom: 10, background: '#fafaf7' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 }}>
+                  <span style={{ fontSize: 11, color: '#91a796', fontWeight: 700, marginRight: 8 }}>#{i + 1}</span>
+                  <b style={{ fontSize: 13, color: '#1e3d2c', flex: 1 }}>{item.name}</b>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: '#1e3d2c' }}>{money(lineTotal)}</span>
+                </div>
+                <div style={{ fontSize: 11, color: '#7d877d' }}>Item Subtotal &nbsp;&nbsp; {item.qty} × {money(item.price)} = {money(item.qty * item.price)}</div>
+                <div style={{ fontSize: 11, color: '#a9663b', marginTop: 2 }}>Discount (%): {item.discountPct} &nbsp;&nbsp; {item.discountPct > 0 ? money(item.qty * item.price * item.discountPct / 100) : '₹ 0'}</div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      <div style={{ background: '#fff', marginTop: 8, padding: '0 16px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', padding: '14px 0', borderBottom: '1px solid #eee9df' }}>
+          <span style={{ fontSize: 13, color: '#536157' }}>Total</span><span style={{ fontSize: 13, fontWeight: 700, color: '#1e3d2c' }}>{money(tx.total)}</span>
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', padding: '14px 0', borderBottom: '1px solid #eee9df' }}>
+          <span style={{ fontSize: 13, color: '#536157' }}>Received</span><span style={{ fontSize: 13, color: '#3a6647', fontWeight: 600 }}>{money(tx.received)}</span>
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', padding: '14px 0' }}>
+          <span style={{ fontSize: 14, fontWeight: 700, color: calcTxBalance(tx) > 0 ? '#a24840' : '#3a6647' }}>Balance Due</span>
+          <span style={{ fontSize: 14, fontWeight: 700, color: calcTxBalance(tx) > 0 ? '#a24840' : '#3a6647' }}>{money(calcTxBalance(tx))}</span>
+        </div>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', borderTop: '1px solid #e8e8e8', background: '#fff', marginTop: 8 }}>
+        <button onClick={onDelete} style={{ padding: '16px', background: '#fff', border: 'none', borderRight: '1px solid #e8e8e8', fontSize: 15, fontWeight: 600, color: '#a24840', cursor: 'pointer' }}>Delete</button>
+        <button onClick={onEdit} style={{ padding: '16px', background: '#1565c0', border: 'none', fontSize: 15, fontWeight: 700, color: '#fff', cursor: 'pointer' }}>Edit</button>
+      </div>
+    </main>
+  );
+}
+
+// ── Party Detail ───────────────────────────────────────────────────────────
+function PartyDetail({ party, onBack, onTxClick, onAddTx, onEditParty, onTakePayment, onAddSale }: { party: Party; onBack: () => void; onTxClick: (tx: PartyTransaction) => void; onAddTx: () => void; onEditParty: () => void; onTakePayment: () => void; onAddSale: () => void }) {
+  const [query, setQuery] = useState('');
+  const totalPayable = party.transactions.reduce((s, tx) => s + calcTxBalance(tx), 0);
+  const filtered = party.transactions.filter(tx =>
+    `${tx.type} ${tx.billNo} ${tx.partyName}`.toLowerCase().includes(query.toLowerCase())
+  ).sort((a, b) => b.date.localeCompare(a.date));
+  const statusColor = (s: string) => s === 'Paid' ? '#3a6647' : s === 'Partial' ? '#a9663b' : '#a24840';
+  const statusBg = (s: string) => s === 'Paid' ? '#e5efe3' : s === 'Partial' ? '#f7eadb' : '#f4e1dd';
+  const formatDate = (d: string) => { try { return new Date(`${d}T00:00:00`).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: '2-digit' }); } catch { return d; } };
+
+  return (
+    <main style={{ minHeight: '100vh', background: '#f2f0e8', display: 'flex', flexDirection: 'column' }}>
+      <div style={{ background: '#fff', borderBottom: '1px solid #e8e8e8', padding: '14px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 10 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <button onClick={onBack} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, display: 'flex', alignItems: 'center', color: '#333' }}><ChevronLeft size={22} /></button>
+          <h1 style={{ fontSize: 18, fontWeight: 700, color: '#1a1a1a', margin: 0 }}>Party Details</h1>
+        </div>
+        <button onClick={onEditParty} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#315a41', display: 'flex', alignItems: 'center' }}><Pencil size={18} /></button>
+      </div>
+
+      <div style={{ background: '#fff', margin: '10px 12px', borderRadius: 10, border: '1px solid #e7e2d6', padding: '16px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
+          <div>
+            <div style={{ fontSize: 16, fontWeight: 700, color: '#1a1a1a' }}>{party.name}</div>
+            <div style={{ fontSize: 12, color: '#1976d2', marginTop: 2 }}>{party.phone || 'Add Phone'}</div>
+          </div>
+          <div style={{ textAlign: 'right' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 5, color: '#a24840', fontSize: 13, fontWeight: 700, justifyContent: 'flex-end' }}>
+              <ArrowUpRight size={14} /> Payable: {money(totalPayable)}
+            </div>
+            <div style={{ fontSize: 11, color: '#8a9389', marginTop: 2 }}>No Credit Limit Set</div>
+          </div>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1px 1fr', marginTop: 8, borderTop: '1px solid #eee9df', paddingTop: 10 }}>
+          <button style={{ background: 'none', border: 'none', cursor: 'not-allowed', opacity: 0.45, fontSize: 13, fontWeight: 600, color: '#536157', display: 'flex', alignItems: 'center', gap: 6, justifyContent: 'center', padding: '6px 0' }}>
+            <Bell size={15} /> Send Reminder
+          </button>
+          <div style={{ background: '#e0e0e0' }} />
+          <button style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 600, color: '#1976d2', display: 'flex', alignItems: 'center', gap: 6, justifyContent: 'center', padding: '6px 0' }}>
+            <FileText size={15} /> Send Statement
+          </button>
+        </div>
+      </div>
+
+      <div style={{ margin: '0 12px 8px', background: '#fff', borderRadius: 10, border: '1px solid #e7e2d6', padding: '8px 12px', display: 'flex', alignItems: 'center', gap: 8 }}>
+        <Search size={16} style={{ color: '#8a9389', flexShrink: 0 }} />
+        <input value={query} onChange={e => setQuery(e.target.value)} placeholder="Search Transactions" style={{ border: 'none', background: 'transparent', flex: 1, fontSize: 14, color: '#1a1a1a', outline: 'none' }} />
+      </div>
+
+      <div style={{ flex: 1, padding: '0 12px 100px' }}>
+        {filtered.length === 0 && (
+          <div style={{ textAlign: 'center', padding: '48px 20px', color: '#8a9389' }}>
+            <FileText size={32} style={{ opacity: 0.3, marginBottom: 8 }} />
+            <div style={{ fontSize: 14, fontWeight: 600 }}>No transactions yet</div>
+            <div style={{ fontSize: 12, marginTop: 4 }}>Add a purchase or payment to get started.</div>
+          </div>
+        )}
+        {filtered.map(tx => {
+          const bal = calcTxBalance(tx);
+          return (
+            <div key={tx.id} onClick={() => onTxClick(tx)}
+              style={{ background: '#fff', borderRadius: 10, border: '1px solid #e7e2d6', padding: '14px 16px', marginBottom: 10, cursor: 'pointer' }}
+              onMouseEnter={e => (e.currentTarget as HTMLDivElement).style.boxShadow = '0 2px 12px rgba(30,61,44,0.10)'}
+              onMouseLeave={e => (e.currentTarget as HTMLDivElement).style.boxShadow = 'none'}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                <div style={{ fontWeight: 700, fontSize: 14, color: '#1a1a1a' }}>{tx.type}</div>
+                <div style={{ fontSize: 11, color: '#8a9389' }}>#{tx.billNo} &nbsp; {formatDate(tx.date)} · {tx.time}</div>
+              </div>
+              <div style={{ marginBottom: 8 }}>
+                <span style={{ fontSize: 10, fontWeight: 700, padding: '3px 8px', borderRadius: 12, background: statusBg(tx.status), color: statusColor(tx.status), letterSpacing: '0.3px' }}>{tx.status.toUpperCase()}</span>
+              </div>
+              <div style={{ display: 'flex', gap: 24, fontSize: 12, color: '#536157' }}>
+                <div><div style={{ fontSize: 10, color: '#8a9389', marginBottom: 2 }}>Total</div><div style={{ fontWeight: 700, color: '#1a1a1a' }}>{money(tx.total)}</div></div>
+                <div><div style={{ fontSize: 10, color: '#8a9389', marginBottom: 2 }}>Balance</div><div style={{ fontWeight: 700, color: bal > 0 ? '#a24840' : '#3a6647' }}>{money(bal)}</div></div>
+                <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <button onClick={e => e.stopPropagation()} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#8a9389', display: 'flex', alignItems: 'center' }}><Printer size={16} /></button>
+                  <button onClick={e => e.stopPropagation()} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#8a9389', display: 'flex', alignItems: 'center' }}><Share2 size={16} /></button>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <div style={{ position: 'fixed', bottom: 0, left: '50%', transform: 'translateX(-50%)', width: '100%', maxWidth: 900, background: 'linear-gradient(to top, rgba(242,240,232,0.98) 80%, transparent)', padding: '16px 24px 20px', display: 'flex', gap: 12, alignItems: 'center', zIndex: 20 }}>
+        <button onClick={onTakePayment} className="btn primary" style={{ flex: 1, padding: '12px 0', borderRadius: 28, fontSize: 14, fontWeight: 700, justifyContent: 'center', boxShadow: '0 4px 16px rgba(36,76,56,0.25)' }}>Take Payment</button>
+        <button onClick={onAddTx} style={{ width: 46, height: 46, background: '#fff', color: '#244c38', border: '2px solid #244c38', borderRadius: '50%', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, boxShadow: '0 2px 10px rgba(0,0,0,0.12)' }}><Plus size={20} /></button>
+        <button onClick={onAddSale} className="btn danger" style={{ flex: 1, padding: '12px 0', borderRadius: 28, fontSize: 14, fontWeight: 700, background: '#a3453e', color: '#fff', border: 'none', justifyContent: 'center', boxShadow: '0 4px 16px rgba(163,69,62,0.30)' }}>Add Sale</button>
+      </div>
+    </main>
+  );
+}
+
+// ── Add / Edit Transaction Form ────────────────────────────────────────────
+function PartyTxForm({ initial, partyName, nextNo, nowTime, books, onSave, onClose, onDelete }: {
+  initial: PartyTransaction | null; partyName: string; nextNo: string; nowTime: string; books: Book[];
+  onSave: (tx: PartyTransaction) => void; onClose: () => void; onDelete?: () => void;
+}) {
+  const blank: Omit<PartyTransaction, 'id'> = {
+    type: 'Purchase', billNo: nextNo, date: today, time: nowTime, partyName, billingName: partyName,
+    phone: '', items: [], total: 0, received: 0, status: 'Unpaid', notes: '',
+  };
+  const [f, setF] = useState<Omit<PartyTransaction, 'id'>>(initial || blank);
+  const set = (k: string, v: any) => setF(p => ({ ...p, [k]: v }));
+  const [selBook, setSelBook] = useState('');
+  const [selQty, setSelQty] = useState(1);
+  const [selPrice, setSelPrice] = useState(0);
+  const [selDisc, setSelDisc] = useState(0);
+
+  const itemsSub = f.items.reduce((s, i) => s + i.qty * i.price * (1 - i.discountPct / 100), 0);
+  const balDue = itemsSub - f.received;
+
+  const addItem = () => {
+    const book = books.find(b => b.id === selBook);
+    const name = book?.title || (selBook ? selBook : '');
+    const price = selPrice || (book?.price || 0);
+    if (!name || price <= 0) return;
+    setF(p => ({ ...p, items: [...p.items, { id: idFor('TXI'), name, qty: selQty, price, discountPct: selDisc }] }));
+    setSelBook(''); setSelQty(1); setSelPrice(0); setSelDisc(0);
+  };
+
+  const remItem = (id: string) => setF(p => ({ ...p, items: p.items.filter(i => i.id !== id) }));
+
+  const handleSave = () => {
+    const computedTotal = f.items.reduce((s, i) => s + i.qty * i.price * (1 - i.discountPct / 100), 0);
+    const st: PartyTransaction['status'] = f.received === 0 ? 'Unpaid' : f.received >= computedTotal ? 'Paid' : 'Partial';
+    onSave({ ...f, id: initial?.id || idFor('PTX'), total: computedTotal, status: st });
+  };
+
+  return (
+    <main className="page" style={{ maxWidth: 700 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
+        <button className="icon-button" onClick={onClose} style={{ border: '1px solid #e2ded2', flexShrink: 0 }}><ArrowRight style={{ transform: 'rotate(180deg)' }} /></button>
+        <h1 style={{ fontFamily: 'var(--app-font-serif)', fontSize: 22, margin: 0, color: '#1e3d2c', flex: 1 }}>{initial ? 'Edit Transaction' : 'New Transaction'}</h1>
+        {onDelete && <button className="btn danger" onClick={onDelete}><Trash2 /> Delete</button>}
+        <button className="btn primary" onClick={handleSave}><Save /> Save</button>
+      </div>
+
+      <section className="panel panel-pad" style={{ marginBottom: 14 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 14 }}>
+          <div className="field"><label>Type</label>
+            <select value={f.type} onChange={e => set('type', e.target.value)}>
+              {(['Purchase', 'Payment-Out', 'Debit Note', 'Party To Party'] as const).map(t => <option key={t}>{t}</option>)}
+            </select>
+          </div>
+          <div className="field"><label>Bill No.</label><input value={f.billNo} onChange={e => set('billNo', e.target.value)} /></div>
+          <div className="field"><label>Date</label><input type="date" value={f.date} onChange={e => set('date', e.target.value)} /></div>
+          <div className="field"><label>Time</label><input type="time" value={f.time} onChange={e => set('time', e.target.value)} /></div>
+        </div>
+      </section>
+
+      <section className="panel panel-pad" style={{ marginBottom: 14 }}>
+        <h2 style={{ fontFamily: 'var(--app-font-serif)', fontSize: 16, margin: '0 0 12px', color: '#264333' }}>Party Details</h2>
+        <div className="field" style={{ marginBottom: 10 }}><label>Party Name *</label><input required value={f.partyName} onChange={e => set('partyName', e.target.value)} placeholder="Party name" /></div>
+        <div className="field" style={{ marginBottom: 10 }}><label>Billing Name (Optional)</label><input value={f.billingName} onChange={e => set('billingName', e.target.value)} placeholder="Same as party name" /></div>
+        <div className="field"><label>Phone Number</label><input value={f.phone} onChange={e => set('phone', e.target.value)} placeholder="+91 00000 00000" /></div>
+      </section>
+
+      <section className="panel" style={{ marginBottom: 14 }}>
+        <div style={{ background: '#4a90d9', borderRadius: '12px 12px 0 0', padding: '12px 18px', display: 'flex', alignItems: 'center', gap: 8, color: '#fff', fontWeight: 600, fontSize: 13 }}><BookOpen size={15} /> Billed Items ({f.items.length})</div>
+        <div className="panel-pad">
+          {f.items.map((item, i) => (
+            <div key={item.id} style={{ border: '1px solid #e7e1d4', borderRadius: 9, padding: 13, marginBottom: 10, background: '#fafaf7' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
+                <span style={{ fontSize: 11, color: '#91a796', fontWeight: 700 }}>#{i + 1}</span>
+                <b style={{ fontSize: 13, color: '#1e3d2c', flex: 1, marginLeft: 8 }}>{item.name}</b>
+                <span style={{ fontSize: 13, fontWeight: 700, color: '#1e3d2c' }}>{money(item.qty * item.price * (1 - item.discountPct / 100))}</span>
+              </div>
+              <div style={{ fontSize: 11, color: '#7d877d', marginBottom: 4 }}>Subtotal: {item.qty} × {money(item.price)} = {money(item.qty * item.price)}</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr auto', gap: 8, alignItems: 'flex-end', marginTop: 8 }}>
+                <div className="field" style={{ marginBottom: 0, gap: 3 }}><label style={{ fontSize: 9 }}>QTY</label><input type="number" min="1" value={item.qty} style={{ height: 32 }} onChange={e => setF(p => ({ ...p, items: p.items.map(x => x.id === item.id ? { ...x, qty: Number(e.target.value) } : x) }))} /></div>
+                <div className="field" style={{ marginBottom: 0, gap: 3 }}><label style={{ fontSize: 9 }}>PRICE (₹)</label><input type="number" min="0" value={item.price} style={{ height: 32 }} onChange={e => setF(p => ({ ...p, items: p.items.map(x => x.id === item.id ? { ...x, price: Number(e.target.value) } : x) }))} /></div>
+                <div className="field" style={{ marginBottom: 0, gap: 3 }}><label style={{ fontSize: 9 }}>DISC %</label><input type="number" min="0" max="100" value={item.discountPct} style={{ height: 32 }} onChange={e => setF(p => ({ ...p, items: p.items.map(x => x.id === item.id ? { ...x, discountPct: Number(e.target.value) } : x) }))} /></div>
+                <button className="icon-button" style={{ border: '1px solid #e4ddd2', marginBottom: 1 }} onClick={() => remItem(item.id)}><Trash2 /></button>
+              </div>
+            </div>
+          ))}
+          <div style={{ border: '1.5px dashed #c5c0b4', borderRadius: 9, padding: 14, background: '#f9f8f3' }}>
+            <div style={{ fontSize: 10, fontWeight: 700, color: '#8a9389', letterSpacing: '0.8px', marginBottom: 10 }}>ADD ITEM</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '2fr 0.7fr 1fr 0.7fr auto', gap: 8, alignItems: 'flex-end' }}>
+              <div className="field" style={{ marginBottom: 0, gap: 3 }}><label style={{ fontSize: 9 }}>BOOK</label>
+                <select value={selBook} onChange={e => { setSelBook(e.target.value); const b = books.find(b => b.id === e.target.value); if (b) setSelPrice(b.price); }} style={{ height: 34 }}>
+                  <option value="">Select book…</option>{books.map(b => <option key={b.id} value={b.id}>{b.title}</option>)}
+                </select>
+              </div>
+              <div className="field" style={{ marginBottom: 0, gap: 3 }}><label style={{ fontSize: 9 }}>QTY</label><input type="number" min="1" value={selQty} style={{ height: 34 }} onChange={e => setSelQty(Number(e.target.value))} /></div>
+              <div className="field" style={{ marginBottom: 0, gap: 3 }}><label style={{ fontSize: 9 }}>PRICE (₹)</label><input type="number" min="0" value={selPrice} style={{ height: 34 }} onChange={e => setSelPrice(Number(e.target.value))} /></div>
+              <div className="field" style={{ marginBottom: 0, gap: 3 }}><label style={{ fontSize: 9 }}>DISC %</label><input type="number" min="0" max="100" value={selDisc} style={{ height: 34 }} onChange={e => setSelDisc(Number(e.target.value))} /></div>
+              <button className="btn primary" style={{ height: 34, padding: '0 12px' }} onClick={addItem}><Plus size={13} /></button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="panel panel-pad" style={{ marginBottom: 28 }}>
+        <h2 style={{ fontFamily: 'var(--app-font-serif)', fontSize: 16, margin: '0 0 14px', color: '#264333' }}>Payment</h2>
+        <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid #eee9df' }}>
+          <span style={{ fontSize: 13, color: '#536157' }}>Total</span><span style={{ fontSize: 15, fontWeight: 700, color: '#1e3d2c' }}>{money(itemsSub)}</span>
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0' }}>
+          <span style={{ fontSize: 13, color: '#536157' }}>Received</span>
+          <input type="number" min="0" value={f.received} onChange={e => set('received', Number(e.target.value))} style={{ width: 130, height: 32, border: '1px solid #e2ded2', borderRadius: 7, padding: '0 8px', fontSize: 13 }} />
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 0', borderTop: '1px solid #eee9df' }}>
+          <span style={{ fontSize: 14, fontWeight: 700, color: balDue > 0 ? '#a24840' : '#3a6647' }}>Balance Due</span>
+          <span style={{ fontSize: 14, fontWeight: 700, color: balDue > 0 ? '#a24840' : '#3a6647' }}>{money(Math.max(0, balDue))}</span>
+        </div>
+      </section>
+    </main>
+  );
+}
+
+// ── Add Party Modal ────────────────────────────────────────────────────────
+function AddPartyForm({ initial, onSave, onClose }: { initial: Party | null; onSave: (p: Party) => void; onClose: () => void }) {
+  const [name, setName] = useState(initial?.name || '');
+  const [phone, setPhone] = useState(initial?.phone || '');
+  const [billingName, setBillingName] = useState(initial?.billingName || '');
+  const handleSave = () => {
+    if (!name.trim()) return;
+    onSave({ id: initial?.id || idFor('PTY'), name: name.trim(), phone, billingName: billingName || name.trim(), lastDate: today, transactions: initial?.transactions || [] });
+  };
+  return (
+    <div className="modal-backdrop" onMouseDown={e => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="modal" role="dialog" aria-modal="true">
+        <div className="modal-head">
+          <div><h2>{initial ? 'Edit Party' : 'Add New Party'}</h2><p>Name, contact, and billing details</p></div>
+          <button type="button" className="icon-button" onClick={onClose} aria-label="Close"><X /></button>
+        </div>
+        <div className="modal-body">
+          <div className="form-grid">
+            <div className="field full"><label>Party Name *</label><input required value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Avni Prakashan Pvt. Ltd." /></div>
+            <div className="field"><label>Billing Name (Optional)</label><input value={billingName} onChange={e => setBillingName(e.target.value)} placeholder="Same as party name" /></div>
+            <div className="field"><label>Phone Number</label><input value={phone} onChange={e => setPhone(e.target.value)} placeholder="+91 00000 00000" /></div>
+          </div>
+        </div>
+        <div className="modal-foot">
+          <button className="btn" type="button" onClick={onClose}>Cancel</button>
+          <button className="btn primary" type="button" onClick={handleSave}><Save /> {initial ? 'Save Changes' : 'Add Party'}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Parties Page (main entry point) ───────────────────────────────────────
+function PartiesPage({ data }: { data: Dataset }) {
+  const [parties, setParties] = useState<Party[]>(readParties);
+  const [view, setView] = useState<'list' | 'detail' | 'tx-form' | 'bill-detail' | 'payment-in-form' | 'sale-invoice-form'>('list');
+  const [selectedParty, setSelectedParty] = useState<Party | null>(null);
+  const [selectedTx, setSelectedTx] = useState<PartyTransaction | null>(null);
+  const [editingTx, setEditingTx] = useState<PartyTransaction | null>(null);
+  const [showAddParty, setShowAddParty] = useState(false);
+  const [editingParty, setEditingParty] = useState<Party | null>(null);
+  const [query, setQuery] = useState('');
+
+  // Payment-In store (shared with /sale/payment-in)
+  const [paymentIns, setPaymentIns] = useState<PaymentIn[]>(() => {
+    try { const v = localStorage.getItem(PAYMENT_IN_KEY); return v ? JSON.parse(v) : []; } catch { return []; }
+  });
+  useEffect(() => { localStorage.setItem(PAYMENT_IN_KEY, JSON.stringify(paymentIns)); }, [paymentIns]);
+
+  // Sale Invoice store (shared with /sale/invoice)
+  const [saleInvoices, setSaleInvoices] = useState<SaleInvoiceType[]>(() => {
+    try { const v = localStorage.getItem(INVOICE_KEY); return v ? JSON.parse(v) : []; } catch { return []; }
+  });
+  useEffect(() => { localStorage.setItem(INVOICE_KEY, JSON.stringify(saleInvoices)); }, [saleInvoices]);
+
+  useEffect(() => { savePartiesStore(parties); }, [parties]);
+
+  const nowTime = () => new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
+  const nextPaymentNo = () => `${paymentIns.length + 1}`;
+  const nextInvoiceNo = () => `BB-${String(saleInvoices.length + 1).padStart(4, '0')}`;
+
+  const saveParty = (p: Party) => {
+    setParties(prev => { const exists = prev.find(x => x.id === p.id); return exists ? prev.map(x => x.id === p.id ? { ...x, ...p } : x) : [p, ...prev]; });
+    setShowAddParty(false); setEditingParty(null);
+  };
+
+  const saveTx = (tx: PartyTransaction) => {
+    if (!selectedParty) return;
+    const updated = parties.map(p => {
+      if (p.id !== selectedParty.id) return p;
+      const exists = p.transactions.find(t => t.id === tx.id);
+      const txs = exists ? p.transactions.map(t => t.id === tx.id ? tx : t) : [tx, ...p.transactions];
+      return { ...p, transactions: txs, lastDate: tx.date };
+    });
+    setParties(updated);
+    setSelectedParty(updated.find(p => p.id === selectedParty.id)!);
+    setView('detail'); setEditingTx(null);
+  };
+
+  const deleteTx = (txId: string) => {
+    if (!selectedParty) return;
+    const updated = parties.map(p => p.id !== selectedParty.id ? p : { ...p, transactions: p.transactions.filter(t => t.id !== txId) });
+    setParties(updated);
+    setSelectedParty(updated.find(p => p.id === selectedParty.id)!);
+    setView('detail'); setSelectedTx(null);
+  };
+
+  const nextTxNo = () => selectedParty ? String(selectedParty.transactions.length + 1) : '1';
+  const formatDate = (d: string) => { try { return new Date(`${d}T00:00:00`).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: '2-digit' }); } catch { return d; } };
+  const filteredParties = parties.filter(p => p.name.toLowerCase().includes(query.toLowerCase()));
+
+  // ── Payment-In form (inline, shared store)
+  if (view === 'payment-in-form') {
+    return (
+      <PaymentInForm
+        initial={null}
+        nextNo={nextPaymentNo()}
+        nowTime={nowTime()}
+        onSave={(rec) => {
+          setPaymentIns(prev => [rec, ...prev]);
+          setView('detail');
+        }}
+        onClose={() => setView('detail')}
+      />
+    );
+  }
+
+  // ── Sale Invoice form (inline, shared store)
+  if (view === 'sale-invoice-form') {
+    return (
+      <InvoiceForm
+        data={data}
+        initial={null}
+        nextNo={nextInvoiceNo()}
+        nowTime={nowTime()}
+        onSave={(inv) => {
+          setSaleInvoices(prev => [inv, ...prev]);
+          setView('detail');
+        }}
+        onClose={() => setView('detail')}
+      />
+    );
+  }
+
+  // Bill Detail
+  if (view === 'bill-detail' && selectedTx) return (
+    <>
+      <PartyBillDetail tx={selectedTx} onBack={() => { setView('detail'); setSelectedTx(null); }} onEdit={() => { setEditingTx(selectedTx); setView('tx-form'); }} onDelete={() => deleteTx(selectedTx.id)} />
+      {showAddParty && editingParty && <AddPartyForm initial={editingParty} onSave={saveParty} onClose={() => { setShowAddParty(false); setEditingParty(null); }} />}
+    </>
+  );
+
+  // Transaction Form
+  if (view === 'tx-form' && selectedParty) return (
+    <PartyTxForm initial={editingTx} partyName={selectedParty.name} nextNo={nextTxNo()} nowTime={nowTime()} books={data.books} onSave={saveTx} onClose={() => { setView('detail'); setEditingTx(null); }} onDelete={editingTx ? () => deleteTx(editingTx.id) : undefined} />
+  );
+
+  // Party Detail
+  if (view === 'detail' && selectedParty) {
+    const refreshed = parties.find(p => p.id === selectedParty.id) || selectedParty;
+    return (
+      <>
+        <PartyDetail
+          party={refreshed}
+          onBack={() => { setView('list'); setSelectedParty(null); }}
+          onTxClick={tx => { setSelectedTx(tx); setView('bill-detail'); }}
+          onAddTx={() => { setEditingTx(null); setView('tx-form'); }}
+          onEditParty={() => { setEditingParty(refreshed); setShowAddParty(true); }}
+          onTakePayment={() => setView('payment-in-form')}
+          onAddSale={() => setView('sale-invoice-form')}
+        />
+        {showAddParty && editingParty && <AddPartyForm initial={editingParty} onSave={saveParty} onClose={() => { setShowAddParty(false); setEditingParty(null); }} />}
+      </>
+    );
+  }
+
+  // All Parties List
+  const totalPayable = parties.reduce((s, p) => s + p.transactions.reduce((ts, tx) => ts + calcTxBalance(tx), 0), 0);
+  return (
+    <main className="page">
+      <Heading eyebrow="Ledger" title="Parties" subtitle="Manage your buyers and suppliers in one place.">
+        <button className="btn primary" onClick={() => { setEditingParty(null); setShowAddParty(true); }}><Plus /> Add new party</button>
+      </Heading>
+
+      <div className="stat-grid">
+        <Stat label="Total Parties" value={parties.length} note="Buyers & suppliers" Icon={Users2} />
+        <Stat label="You'll Give" value={money(totalPayable)} note="Total payable balance" Icon={ArrowUpLeft} tint="red" />
+        <Stat label="Total Transactions" value={parties.reduce((s, p) => s + p.transactions.length, 0)} note="All bills & payments" Icon={FileText} />
+        <Stat label="Active This Month" value={parties.filter(p => p.lastDate >= today.slice(0, 8) + '01').length} note="Had activity this month" Icon={PackageCheck} />
+      </div>
+
+      <div className="toolbar" style={{ marginBottom: 16 }}>
+        <div className="search-box" style={{ maxWidth: '100%', flex: 1 }}>
+          <Search /><input value={query} onChange={e => setQuery(e.target.value)} placeholder="Search Parties…" />
+        </div>
+      </div>
+
+      {filteredParties.length === 0 ? (
+        <TableEmpty label="No parties yet" detail="Add your first buyer or supplier to get started." Icon={Users2} action={
+          <button className="btn primary" onClick={() => { setEditingParty(null); setShowAddParty(true); }}><Plus /> Add new party</button>
+        } />
+      ) : (
+        <section className="panel">
+          {filteredParties.map((party, i) => {
+            const payable = party.transactions.reduce((s, tx) => s + calcTxBalance(tx), 0);
+            const lastTx = [...party.transactions].sort((a, b) => b.date.localeCompare(a.date))[0];
+            return (
+              <div key={party.id} onClick={() => { setSelectedParty(party); setView('detail'); }}
+                style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 20px', borderBottom: i < filteredParties.length - 1 ? '1px solid #eee9df' : 'none', cursor: 'pointer', background: '#fbfaf5', transition: 'background .15s' }}
+                onMouseEnter={e => (e.currentTarget as HTMLDivElement).style.background = '#f3f1e8'}
+                onMouseLeave={e => (e.currentTarget as HTMLDivElement).style.background = '#fbfaf5'}
+              >
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: 14, color: '#1e3d2c' }}>{party.name}</div>
+                  <div style={{ fontSize: 11, color: '#8a9389', marginTop: 2 }}>{lastTx ? formatDate(lastTx.date) : 'No transactions'}</div>
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <div style={{ fontSize: 15, fontWeight: 700, color: payable > 0 ? '#a24840' : '#3a6647' }}>{money(payable)}</div>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: payable > 0 ? '#a24840' : '#3a6647', marginTop: 2 }}>{payable > 0 ? "You'll Give" : payable < 0 ? "You'll Get" : '—'}</div>
+                </div>
+              </div>
+            );
+          })}
+        </section>
+      )}
+
+      {showAddParty && <AddPartyForm initial={editingParty} onSave={saveParty} onClose={() => { setShowAddParty(false); setEditingParty(null); }} />}
+    </main>
+  );
+}
+
 function AppShell({children}:{children:ReactNode}) {
   const [location]=useLocation(); const [menu,setMenu]=useState(false); const [saleOpen,setSaleOpen]=useState(()=>location.startsWith('/sale'));
   const [purchaseOpen,setPurchaseOpen]=useState(()=>location.startsWith('/purchase'));
@@ -2110,7 +2653,7 @@ function AppContent(){
     <Switch>
       <Route path="/"><Dashboard {...context}/></Route>
       <Route path="/customers"><Customers {...context}/></Route>
-      <Route path="/parties"><ComingSoon title="Parties" sub="Manage your buyers and suppliers in one place." Icon={Users2}/></Route>
+      <Route path="/parties"><PartiesPage data={data}/></Route>
       <Route path="/books"><Books {...context}/></Route>
       <Route path="/offers"><Offers {...context}/></Route>
       <Route path="/inventory"><Inventory {...context}/></Route>
@@ -2228,8 +2771,8 @@ function Editor({form,data,pubs,onAddPub,onClose,onSave}:{form:Exclude<FormState
  const title=kind==='customer'?(editing?'Edit customer account':'Create customer account'):kind==='book'?(editing?'Edit book details':'Add a book to catalog'):kind==='offer'?(editing?'Edit offer':'Create an offer'):kind==='purchase'?(editing?'Edit purchase':'Record purchase'):'Adjust stock';
  const desc=kind==='customer'?'Account details and publication permissions':kind==='book'?'Catalog information, pricing, and stock threshold':kind==='offer'?'Choose the books and dates for this offer':kind==='purchase'?'Log a wholesaler purchase and payment status':'Record a stock movement';
  return <div className="modal-backdrop" onMouseDown={e=>{if(e.target===e.currentTarget)onClose()}}><form className="modal" onSubmit={submit} role="dialog" aria-modal="true"><div className="modal-head"><div><h2>{title}</h2><p>{desc}</p></div><button type="button" className="icon-button" onClick={onClose} aria-label="Close"><X/></button></div><div className="modal-body">
-  {kind==='customer'&&<div className="form-grid"><div className="field"><label>Full name *</label><input required value={values.name} onChange={e=>set('name',e.target.value)} placeholder="e.g. Aanya Sharma"/></div><div className="field"><label>Email address *</label><input required type="email" value={values.email} onChange={e=>set('email',e.target.value)} placeholder="family@email.com"/></div><div className="field"><label>Phone number *</label><input required value={values.phone} onChange={e=>set('phone',e.target.value)} placeholder="+91 98xxx xxxxx"/></div><div className="field"><label>School *</label><input required value={values.school} onChange={e=>set('school',e.target.value)} placeholder="School name"/></div><div className="field"><label>Amount Paid (₹)</label><input type="number" min="0" value={values.amountPaid ?? ''} onChange={e=>set('amountPaid',e.target.value)}/></div><div className="field"><label>Amount Due (₹)</label><input type="number" min="0" value={values.amountDue ?? ''} onChange={e=>set('amountDue',e.target.value)}/></div><div className="field"><label>Account status</label><select value={values.status} onChange={e=>set('status',e.target.value)}><option>Active</option><option>Pending</option><option>Inactive</option></select></div><div className="field full"><label>Assign specific books</label><div style={{display:'flex',gap:8,marginBottom:8}}><select style={{flex:1}} value={selClass} onChange={e=>{setSelClass(e.target.value);setSelPub('');setSelBook('');}}><option value="">Select Class</option>{Array.from({length:12},(_,i)=>`Class ${i+1}`).map(x=><option key={x}>{x}</option>)}</select><select style={{flex:1}} value={selPub} onChange={e=>{setSelPub(e.target.value);setSelBook('');}} disabled={!selClass}><option value="">Select Publication</option>{Array.from(new Set(data.books.filter(b=>b.className===selClass).map(b=>b.publication))).map(p=><option key={p}>{p}</option>)}</select><select style={{flex:1}} value={selBook} onChange={e=>setSelBook(e.target.value)} disabled={!selPub}><option value="">Select Book</option>{data.books.filter(b=>b.className===selClass&&b.publication===selPub).map(b=><option key={b.id} value={b.id}>{b.title}</option>)}</select><button type="button" className="btn" disabled={!selBook} onClick={()=>{if(!values.allowedBooks?.includes(selBook))set('allowedBooks',[...(values.allowedBooks||[]),selBook]);setSelBook('');}}>Add</button></div><div className="checks">{(values.allowedBooks||[]).map((id:string)=>{const b=data.books.find(x=>x.id===id);return <label className="check-pill" key={id}><input type="checkbox" checked onChange={()=>set('allowedBooks',values.allowedBooks.filter((x:string)=>x!==id))}/>{b?.title||id}</label>})}</div><span className="muted">Families can only purchase these selected titles.</span></div></div>}
-  {kind==='book'&&<div className="form-grid"><div className="field full"><label>Book title *</label><input required value={values.title} onChange={e=>set('title',e.target.value)} placeholder="Title as it appears on the cover"/></div><div className="field full"><label>Publication *</label><div style={{display:'flex',gap:8,alignItems:'flex-start'}}><select style={{flex:1}} value={values.publication} onChange={e=>set('publication',e.target.value)}>{pubs.map(p=><option key={p}>{p}</option>)}</select><button type="button" title="Add new publication" style={{flexShrink:0,display:'flex',alignItems:'center',gap:5,padding:'8px 12px',background:'#f0efe6',border:'1px solid #d5cfc3',borderRadius:7,cursor:'pointer',fontSize:12,color:'#3a5241',fontWeight:600,whiteSpace:'nowrap'}} onClick={()=>setShowPubInput(v=>!v)}><PlusCircle size={14}/> Add publication</button></div>{showPubInput&&<div style={{display:'flex',gap:8,marginTop:8,alignItems:'center'}}><input style={{flex:1,fontSize:13,padding:'7px 10px',border:'1px solid #d5cfc3',borderRadius:7,outline:'none'}} placeholder="e.g. Oxford University Press" value={newPubInput} onChange={e=>setNewPubInput(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'){e.preventDefault();if(newPubInput.trim()){onAddPub(newPubInput.trim());set('publication',newPubInput.trim());setNewPubInput('');setShowPubInput(false);}}}}/><button type="button" style={{padding:'7px 14px',background:'#3a5241',color:'#fff',border:'none',borderRadius:7,cursor:'pointer',fontWeight:600,fontSize:12}} onClick={()=>{if(newPubInput.trim()){onAddPub(newPubInput.trim());set('publication',newPubInput.trim());setNewPubInput('');setShowPubInput(false);}}}>Add</button><button type="button" style={{padding:'7px 12px',background:'transparent',border:'1px solid #d5cfc3',borderRadius:7,cursor:'pointer',fontSize:12,color:'#536157'}} onClick={()=>{setShowPubInput(false);setNewPubInput('');}}>Cancel</button></div>}</div><div className="field"><label>Subject</label><input value={values.subject} onChange={e=>set('subject',e.target.value)} placeholder="Mathematics"/></div><div className="field"><label>Class</label><select value={values.className} onChange={e=>set('className',e.target.value)}>{Array.from({length:12},(_,i)=>`Class ${i+1}`).map(x=><option key={x}>{x}</option>)}</select></div><div className="field"><label>ISBN</label><input value={values.isbn} onChange={e=>set('isbn',e.target.value)} placeholder="978-…"/></div><div className="field"><label>SKU *</label><input required value={values.sku} onChange={e=>set('sku',e.target.value)} placeholder="RDS-MTH-08"/></div><div className="field"><label>Price (₹) *</label><input required type="number" min="0" step="1" value={values.price} onChange={e=>set('price',e.target.value)} placeholder="0"/></div><div className="field"><label>Units in stock</label><input type="number" min="0" value={values.stock} onChange={e=>set('stock',e.target.value)}/></div><div className="field"><label>Low-stock threshold</label><input type="number" min="0" value={values.lowStockThreshold} onChange={e=>set('lowStockThreshold',e.target.value)}/></div><div className="field"><label>Catalog status</label><select value={values.status} onChange={e=>set('status',e.target.value)}><option>Active</option><option>Draft</option><option>Archived</option></select></div></div>}
+  {kind==='customer'&&<div className="form-grid"><div className="field"><label>Full name *</label><input required value={values.name} onChange={e=>set('name',e.target.value)} placeholder="e.g. Aanya Sharma"/></div><div className="field"><label>Email address *</label><input required type="email" value={values.email} onChange={e=>set('email',e.target.value)} placeholder="family@email.com"/></div><div className="field"><label>Phone number *</label><input required value={values.phone} onChange={e=>set('phone',e.target.value)} placeholder="+91 98xxx xxxxx"/></div><div className="field"><label>School *</label><input required value={values.school} onChange={e=>set('school',e.target.value)} placeholder="School name"/></div><div className="field"><label>Amount Paid (₹)</label><input type="number" min="0" value={values.amountPaid ?? ''} onChange={e=>set('amountPaid',e.target.value)}/></div><div className="field"><label>Amount Due (₹)</label><input type="number" min="0" value={values.amountDue ?? ''} onChange={e=>set('amountDue',e.target.value)}/></div><div className="field"><label>Account status</label><select value={values.status} onChange={e=>set('status',e.target.value)}><option>Active</option><option>Pending</option><option>Inactive</option></select></div><div className="field full"><label>Assign specific books</label><div style={{display:'flex',gap:8,marginBottom:8}}><select style={{flex:1}} value={selClass} onChange={e=>{setSelClass(e.target.value);setSelPub('');setSelBook('');}}><option value="">Select Class</option>{'Pre Nur,Nursery,LKG,UKG'.split(',').concat(Array.from({length:12},(_,i)=>`Class ${i+1}`)).map(x=><option key={x}>{x}</option>)}</select><select style={{flex:1}} value={selPub} onChange={e=>{setSelPub(e.target.value);setSelBook('');}} disabled={!selClass}><option value="">Select Publication</option>{Array.from(new Set(data.books.filter(b=>b.className===selClass).map(b=>b.publication))).map(p=><option key={p}>{p}</option>)}</select><select style={{flex:1}} value={selBook} onChange={e=>setSelBook(e.target.value)} disabled={!selPub}><option value="">Select Book</option>{data.books.filter(b=>b.className===selClass&&b.publication===selPub).map(b=><option key={b.id} value={b.id}>{b.title}</option>)}</select><button type="button" className="btn" disabled={!selBook} onClick={()=>{if(!values.allowedBooks?.includes(selBook))set('allowedBooks',[...(values.allowedBooks||[]),selBook]);setSelBook('');}}>Add</button></div><div className="checks">{(values.allowedBooks||[]).map((id:string)=>{const b=data.books.find(x=>x.id===id);return <label className="check-pill" key={id}><input type="checkbox" checked onChange={()=>set('allowedBooks',values.allowedBooks.filter((x:string)=>x!==id))}/>{b?.title||id}</label>})}</div><span className="muted">Families can only purchase these selected titles.</span></div></div>}
+  {kind==='book'&&<div className="form-grid"><div className="field full"><label>Book title *</label><input required value={values.title} onChange={e=>set('title',e.target.value)} placeholder="Title as it appears on the cover"/></div><div className="field full"><label>Publication *</label><div style={{display:'flex',gap:8,alignItems:'flex-start'}}><select style={{flex:1}} value={values.publication} onChange={e=>set('publication',e.target.value)}>{pubs.map(p=><option key={p}>{p}</option>)}</select><button type="button" title="Add new publication" style={{flexShrink:0,display:'flex',alignItems:'center',gap:5,padding:'8px 12px',background:'#f0efe6',border:'1px solid #d5cfc3',borderRadius:7,cursor:'pointer',fontSize:12,color:'#3a5241',fontWeight:600,whiteSpace:'nowrap'}} onClick={()=>setShowPubInput(v=>!v)}><PlusCircle size={14}/> Add publication</button></div>{showPubInput&&<div style={{display:'flex',gap:8,marginTop:8,alignItems:'center'}}><input style={{flex:1,fontSize:13,padding:'7px 10px',border:'1px solid #d5cfc3',borderRadius:7,outline:'none'}} placeholder="e.g. Oxford University Press" value={newPubInput} onChange={e=>setNewPubInput(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'){e.preventDefault();if(newPubInput.trim()){onAddPub(newPubInput.trim());set('publication',newPubInput.trim());setNewPubInput('');setShowPubInput(false);}}}}/><button type="button" style={{padding:'7px 14px',background:'#3a5241',color:'#fff',border:'none',borderRadius:7,cursor:'pointer',fontWeight:600,fontSize:12}} onClick={()=>{if(newPubInput.trim()){onAddPub(newPubInput.trim());set('publication',newPubInput.trim());setNewPubInput('');setShowPubInput(false);}}}>Add</button><button type="button" style={{padding:'7px 12px',background:'transparent',border:'1px solid #d5cfc3',borderRadius:7,cursor:'pointer',fontSize:12,color:'#536157'}} onClick={()=>{setShowPubInput(false);setNewPubInput('');}}>Cancel</button></div>}</div><div className="field"><label>Subject</label><input value={values.subject} onChange={e=>set('subject',e.target.value)} placeholder="Mathematics"/></div><div className="field"><label>Class</label><select value={values.className} onChange={e=>set('className',e.target.value)}>{'Pre Nur,Nursery,LKG,UKG'.split(',').concat(Array.from({length:12},(_,i)=>`Class ${i+1}`)).map(x=><option key={x}>{x}</option>)}</select></div><div className="field"><label>ISBN</label><input value={values.isbn} onChange={e=>set('isbn',e.target.value)} placeholder="978-…"/></div><div className="field"><label>SKU *</label><input required value={values.sku} onChange={e=>set('sku',e.target.value)} placeholder="RDS-MTH-08"/></div><div className="field"><label>Price (₹) *</label><input required type="number" min="0" step="1" value={values.price} onChange={e=>set('price',e.target.value)} placeholder="0"/></div><div className="field"><label>Units in stock</label><input type="number" min="0" value={values.stock} onChange={e=>set('stock',e.target.value)}/></div><div className="field"><label>Low-stock threshold</label><input type="number" min="0" value={values.lowStockThreshold} onChange={e=>set('lowStockThreshold',e.target.value)}/></div><div className="field"><label>Catalog status</label><select value={values.status} onChange={e=>set('status',e.target.value)}><option>Active</option><option>Draft</option><option>Archived</option></select></div></div>}
   {kind==='offer'&&<div className="form-grid"><div className="field full"><label>Offer name *</label><input required value={values.title} onChange={e=>set('title',e.target.value)} placeholder="A stronger start in maths"/></div><div className="field"><label>Discount (%) *</label><input required type="number" min="1" max="90" value={values.discountPercent} onChange={e=>set('discountPercent',e.target.value)}/></div><div className="field"><label>Status</label><select value={values.status} onChange={e=>set('status',e.target.value)}><option>Active</option><option>Scheduled</option><option>Ended</option></select></div><div className="field"><label>Start date</label><input required type="date" value={values.startDate} onChange={e=>set('startDate',e.target.value)}/></div><div className="field"><label>End date</label><input required type="date" min={values.startDate} value={values.endDate} onChange={e=>set('endDate',e.target.value)}/></div><div className="field full"><label>Included books</label><div className="checks">{data.books.map(b=><label className="check-pill" key={b.id}><input type="checkbox" checked={values.bookIds.includes(b.id)} onChange={e=>set('bookIds',e.target.checked?[...values.bookIds,b.id]:values.bookIds.filter((x:string)=>x!==b.id))}/>{b.title}</label>)}</div></div></div>}
   {kind==='purchase'&&<div className="form-grid"><div className="field full"><label>Wholesaler Name *</label><input required value={values.manufacturer} onChange={e=>set('manufacturer',e.target.value)} placeholder="e.g. Apex Distributors"/></div><div className="field full"><label>Book</label><select required value={values.bookId} onChange={e=>set('bookId',e.target.value)}><option value="">Select a catalog book</option>{data.books.map(b=><option key={b.id} value={b.id}>{b.title} ({b.className})</option>)}</select></div><div className="field"><label>Qty Purchased</label><input type="number" required value={values.qtyPurchased} onChange={e=>set('qtyPurchased',e.target.value)}/></div><div className="field"><label>Amount Paid (₹)</label><input type="number" required value={values.amountPaid} onChange={e=>set('amountPaid',e.target.value)}/></div><div className="field"><label>Amount Due (₹)</label><input type="number" required value={values.amountDue} onChange={e=>set('amountDue',e.target.value)}/></div><div className="field"><label>Payment Status</label><select value={values.status} onChange={e=>set('status',e.target.value)}><option>Paid</option><option>Partial</option><option>Pending</option></select></div><div className="field"><label>Date</label><input type="date" required value={values.date} onChange={e=>set('date',e.target.value)}/></div></div>}
    {kind==='stock'&&<div><div style={{background:'#f0efe6',borderRadius:9,padding:14,marginBottom:17}}><div className="book-title">{form.book?.title}</div><div className="muted">{form.book?.publication} · {form.book?.sku} · Currently {form.book?.stock} units</div></div><div className="field"><label>Quantity change</label><input type="number" required value={values.delta} onChange={e=>set('delta',e.target.value)} placeholder="Use a negative number to record a sale or correction"/><span className="muted">Current quantity: {form.book?.stock}. New quantity cannot be below zero.</span></div><div style={{display:'flex',gap:8,marginTop:14}}><button className="btn" type="button" onClick={()=>set('delta',Number(values.delta)-1)}><Minus/> Remove one</button><button className="btn" type="button" onClick={()=>set('delta',Number(values.delta)+1)}><Plus/> Add one</button></div></div>}
