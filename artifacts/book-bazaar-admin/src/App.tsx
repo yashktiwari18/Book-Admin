@@ -4,28 +4,35 @@ import { ErrorBoundary } from '@/components/error-boundary';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { Link, Route, Switch, useLocation, Router as WouterRouter } from 'wouter';
-import { LayoutDashboard, Truck, Building2, UsersRound, BookOpen, Tags, Boxes, Search, Plus, Pencil, Trash2, ArrowUpRight, ArrowRight, Menu, X, Bell, TriangleAlert, PackageCheck, Library, Check, Minus, Save, CalendarDays, PlusCircle, Users2, FileOutput, FileText, ArrowDownLeft, RotateCcw, ClipboardList, FilePen, ShoppingBag, Package, Smartphone, Wallet, ChevronDown, FileInput, ArrowUpLeft, RotateCw, ClipboardCheck, RefreshCcw, Download, Share2, Eye, Printer, ChevronLeft } from 'lucide-react';
+import { LayoutDashboard, Truck, Building2, UsersRound, BookOpen, Tags, Boxes, Search, Plus, Pencil, Trash2, ArrowUpRight, ArrowRight, Menu, X, Bell, TriangleAlert, PackageCheck, Library, Check, Minus, Save, CalendarDays, PlusCircle, Users2, FileOutput, FileText, ArrowDownLeft, RotateCcw, ClipboardList, FilePen, ShoppingBag, Package, Smartphone, Wallet, ChevronDown, FileInput, ArrowUpLeft, RotateCw, ClipboardCheck, RefreshCcw, Download, Share2, Eye, Printer, ChevronLeft, KeyRound, EyeOff, Lock, GraduationCap, LogOut, LogIn, Copy } from 'lucide-react';
 import NotFound from '@/pages/not-found';
 
-type Customer = { id:string; name:string; email:string; phone:string; school:string; className:string; status:'Active'|'Pending'|'Inactive'; allowedPublications:string[]; allowedBooks?:string[]; joinedAt:string; amountPaid?:number; amountDue?:number };
+type Customer = { id:string; name:string; email:string; phone:string; school:string; className:string; status:'Active'|'Pending'|'Inactive'; allowedPublications:string[]; allowedBooks?:string[]; joinedAt:string; amountPaid?:number; amountDue?:number; password?:string; loginId?:string };
 type Book = { id:string; title:string; author:string; publication:string; subject:string; className:string; isbn:string; sku:string; price:number; stock:number; lowStockThreshold:number; status:'Active'|'Draft'|'Archived' };
 type Offer = { id:string; title:string; bookIds:string[]; discountPercent:number; startDate:string; endDate:string; status:'Active'|'Scheduled'|'Ended' };
 type Purchase = { id:string; manufacturer:string; bookId:string; qtyPurchased:number; qtySold:number; amountPaid:number; amountDue:number; status:'Paid'|'Partial'|'Pending'; date:string };
-type Dataset = { customers:Customer[]; books:Book[]; offers:Offer[]; purchases:Purchase[] };
+type BookBunch = { id:string; name:string; className:string; bookIds:string[]; description?:string };
+type Dataset = { customers:Customer[]; books:Book[]; offers:Offer[]; purchases:Purchase[]; bunches?:BookBunch[] };
 type FormState = { kind:'customer'|'book'|'offer'|'stock'|'purchase'|'bill'; item?:Customer|Book|Offer|Purchase; book?:Book } | null;
 
 const DEFAULT_PUBS=['RD Sharma','R.S. Aggarwal','NCERT','Arihant Publications','S. Chand'];
 const PUBS_KEY='bookbazaar-pubs-v1';
 const readPubs=():string[]=>{try{const v=localStorage.getItem(PUBS_KEY);return v?JSON.parse(v):DEFAULT_PUBS;}catch{return DEFAULT_PUBS;}};
 const today='2025-02-14';
+const DEFAULT_BUNCHES: BookBunch[] = [
+  { id:'BN-01', name:'Class 8 - Complete Set', className:'Class 8', bookIds:['BK-0281','BK-0283'], description:'Maths (RD Sharma) & Reasoning (R.S. Aggarwal)' },
+  { id:'BN-02', name:'Class 10 - Board Prep Set', className:'Class 10', bookIds:['BK-0284','BK-0280'], description:'Maths (RD Sharma) & English (Arihant)' },
+  { id:'BN-03', name:'Class 9 - Foundation Science Set', className:'Class 9', bookIds:['BK-0282'], description:'Science (NCERT)' },
+  { id:'BN-04', name:'Class 11 - Science Stream Set', className:'Class 11', bookIds:['BK-0279'], description:'Understanding Physics (Arihant)' },
+];
 const seed:Dataset={
   customers:[
-    {id:'BB-1048',name:'Aarav Mehta',email:'aarav.mehta@gmail.com',phone:'+91 98765 23410',school:'The Heritage School',className:'Class 8',status:'Active',allowedPublications:['RD Sharma','NCERT'],joinedAt:'2025-01-28',amountPaid:4500,amountDue:1200},
-    {id:'BB-1047',name:'Isha Kapoor',email:'isha.kapoor@gmail.com',phone:'+91 98112 40832',school:'Delhi Public School',className:'Class 10',status:'Active',allowedPublications:['R.S. Aggarwal','Arihant Publications'],joinedAt:'2025-01-26',amountPaid:6200,amountDue:0},
-    {id:'BB-1046',name:'Kabir Sethi',email:'kabir.sethi@gmail.com',phone:'+91 98990 11476',school:'Modern School',className:'Class 6',status:'Pending',allowedPublications:['NCERT'],joinedAt:'2025-01-25',amountPaid:0,amountDue:0},
-    {id:'BB-1045',name:'Anaya Rao',email:'anaya.rao@gmail.com',phone:'+91 98105 77142',school:'Vasant Valley School',className:'Class 9',status:'Active',allowedPublications:['RD Sharma','S. Chand'],joinedAt:'2025-01-23',amountPaid:3200,amountDue:150},
-    {id:'BB-1044',name:'Vihaan Khanna',email:'vihaan.k@gmail.com',phone:'+91 99102 60119',school:'The Shri Ram School',className:'Class 7',status:'Inactive',allowedPublications:['NCERT','Arihant Publications'],joinedAt:'2025-01-20',amountPaid:1800,amountDue:300},
-    {id:'BB-1043',name:'Myra Bansal',email:'myra.bansal@gmail.com',phone:'+91 98108 62214',school:'The Heritage School',className:'Class 5',status:'Active',allowedPublications:['R.S. Aggarwal','NCERT'],joinedAt:'2025-01-18',amountPaid:2700,amountDue:0},
+    {id:'BB-1048',name:'Aarav Mehta',email:'aarav.mehta@gmail.com',phone:'+91 98765 23410',school:'The Heritage School',className:'Class 8',status:'Active',allowedPublications:['RD Sharma','NCERT'],allowedBooks:['BK-0281','BK-0283'],joinedAt:'2025-01-28',amountPaid:4500,amountDue:1200,password:'Aarav@123',loginId:'aarav.mehta'},
+    {id:'BB-1047',name:'Isha Kapoor',email:'isha.kapoor@gmail.com',phone:'+91 98112 40832',school:'Delhi Public School',className:'Class 10',status:'Active',allowedPublications:['R.S. Aggarwal','Arihant Publications'],allowedBooks:['BK-0284','BK-0280'],joinedAt:'2025-01-26',amountPaid:6200,amountDue:0,password:'Isha@123',loginId:'isha.kapoor'},
+    {id:'BB-1046',name:'Kabir Sethi',email:'kabir.sethi@gmail.com',phone:'+91 98990 11476',school:'Modern School',className:'Class 6',status:'Pending',allowedPublications:['NCERT'],allowedBooks:[],joinedAt:'2025-01-25',amountPaid:0,amountDue:0,password:'Kabir@123',loginId:'kabir.sethi'},
+    {id:'BB-1045',name:'Anaya Rao',email:'anaya.rao@gmail.com',phone:'+91 98105 77142',school:'Vasant Valley School',className:'Class 9',status:'Active',allowedPublications:['RD Sharma','S. Chand'],allowedBooks:['BK-0282'],joinedAt:'2025-01-23',amountPaid:3200,amountDue:150,password:'Anaya@123',loginId:'anaya.rao'},
+    {id:'BB-1044',name:'Vihaan Khanna',email:'vihaan.k@gmail.com',phone:'+91 99102 60119',school:'The Shri Ram School',className:'Class 7',status:'Inactive',allowedPublications:['NCERT','Arihant Publications'],allowedBooks:[],joinedAt:'2025-01-20',amountPaid:1800,amountDue:300,password:'Vihaan@123',loginId:'vihaan.k'},
+    {id:'BB-1043',name:'Myra Bansal',email:'myra.bansal@gmail.com',phone:'+91 98108 62214',school:'The Heritage School',className:'Class 5',status:'Active',allowedPublications:['R.S. Aggarwal','NCERT'],allowedBooks:[],joinedAt:'2025-01-18',amountPaid:2700,amountDue:0,password:'Myra@123',loginId:'myra.bansal'},
   ],
   books:[
     {id:'BK-0284',title:'Mathematics for Class 10',author:'Dr. R. D. Sharma',publication:'RD Sharma',subject:'Mathematics',className:'Class 10',isbn:'978-93-5290-814-2',sku:'RDS-MTH-10',price:685,stock:8,lowStockThreshold:12,status:'Active'},
@@ -43,11 +50,12 @@ const seed:Dataset={
   purchases:[
     {id:'PO-1001', manufacturer:'Apex Distributors', bookId:'BK-0284', qtyPurchased:50, qtySold:42, amountPaid:20000, amountDue:14250, status:'Partial', date:'2025-01-10'},
     {id:'PO-1002', manufacturer:'Prime Book Wholesalers', bookId:'BK-0282', qtyPurchased:100, qtySold:97, amountPaid:21500, amountDue:0, status:'Paid', date:'2025-01-12'}
-  ]
+  ],
+  bunches: DEFAULT_BUNCHES
 };
 const queryClient=new QueryClient();
 const money=(n:number)=>`₹${Number(n||0).toLocaleString('en-IN')}`;
-const readStore=():Dataset=>{try{const value=localStorage.getItem('bookbazaar-admin-v1');if(!value)return seed;const parsed=JSON.parse(value);return {...seed,...parsed,purchases:parsed.purchases||seed.purchases};}catch{return seed;}};
+const readStore=():Dataset=>{try{const value=localStorage.getItem('bookbazaar-admin-v1');if(!value)return seed;const parsed=JSON.parse(value);return {...seed,...parsed,customers:(parsed.customers||seed.customers).map((c:Customer)=>({...c,password:c.password||(`${(c.name||'Student').split(' ')[0]}@123`),loginId:c.loginId||(c.email?c.email.split('@')[0]:c.id)})),purchases:parsed.purchases||seed.purchases,bunches:(parsed.bunches&&parsed.bunches.length)?parsed.bunches:DEFAULT_BUNCHES};}catch{return seed;}};
 const idFor=(prefix:string)=>`${prefix}-${Math.random().toString(36).slice(2,7).toUpperCase()}`;
 
 const SALE_SUB = [
@@ -176,34 +184,58 @@ function DigitalInvoice({ inv, onClose, onEdit }: { inv: SaleInvoiceType; onClos
             </div>
           </div>
 
-          {/* Bill To + Invoice Details */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 0, borderBottom: '1px solid #eee9df' }}>
-            <div style={{ padding: '18px 24px', borderRight: '1px solid #eee9df' }}>
-              <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '1.2px', color: '#a9663b', textTransform: 'uppercase', marginBottom: 8 }}>Bill To</div>
-              <div style={{ fontWeight: 700, fontSize: 14, color: '#1e3d2c', marginBottom: 3 }}>{inv.billingName || inv.customerName || '—'}</div>
-              {inv.phone && <div style={{ fontSize: 12, color: '#536157' }}>Contact: {inv.phone}</div>}
-              {inv.partyBalance > 0 && <div style={{ fontSize: 11, color: '#a9663b', marginTop: 4 }}>Previous Balance: {money(inv.partyBalance)}</div>}
-            </div>
-            <div style={{ padding: '18px 24px' }}>
-              <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '1.2px', color: '#a9663b', textTransform: 'uppercase', marginBottom: 8 }}>Invoice Details</div>
-              <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse' }}>
-                <tbody>
-                  {[
-                    ['Invoice No.', inv.invoiceNo],
-                    ['Date', inv.date],
-                    ['Time', inv.time],
-                    ['Payment Mode', inv.paymentType],
-                    inv.paymentRef ? ['Ref No.', inv.paymentRef] : null,
-                  ].filter((r): r is string[] => r !== null).map(([label, val], i) => (
-                    <tr key={i}>
-                      <td style={{ color: '#8a9389', paddingBottom: 4, paddingRight: 12, whiteSpace: 'nowrap' }}>{label}</td>
-                      <td style={{ color: '#2b4435', fontWeight: 600, paddingBottom: 4 }}>{val as string}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
+          {/* Bill To + Ship To + Invoice Details */}
+          {(() => {
+            const billAddr = inv.billingAddress;
+            const shipAddr = inv.shipSameAsBill ? inv.billingAddress : inv.shippingAddress;
+            const fmtAddr = (a: typeof billAddr) => [a?.line1, a?.line2, a?.city && a?.state ? `${a.city}, ${a.state}` : a?.city || a?.state, a?.pincode].filter(Boolean).join('\n');
+            const hasBillAddr = billAddr && (billAddr.line1 || billAddr.city);
+            const hasShipAddr = shipAddr && (shipAddr.line1 || shipAddr.city);
+            return (
+              <div style={{ display: 'grid', gridTemplateColumns: hasBillAddr ? '1fr 1fr 1fr' : '1fr 1fr', gap: 0, borderBottom: '1px solid #eee9df' }}>
+                {/* Bill To */}
+                <div style={{ padding: '18px 20px', borderRight: '1px solid #eee9df' }}>
+                  <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '1.2px', color: '#a9663b', textTransform: 'uppercase', marginBottom: 8 }}>Bill To</div>
+                  <div style={{ fontWeight: 700, fontSize: 13, color: '#1e3d2c', marginBottom: 4 }}>{inv.billingName || inv.customerName || '—'}</div>
+                  {inv.phone && <div style={{ fontSize: 11, color: '#536157', marginBottom: 2 }}>📞 {inv.phone}</div>}
+                  {inv.email && <div style={{ fontSize: 11, color: '#536157', marginBottom: 2 }}>✉ {inv.email}</div>}
+                  {hasBillAddr && <div style={{ fontSize: 11, color: '#536157', marginTop: 6, lineHeight: 1.6, whiteSpace: 'pre-line' }}>{fmtAddr(billAddr)}</div>}
+                  {inv.partyBalance > 0 && <div style={{ fontSize: 11, color: '#a9663b', marginTop: 6, fontWeight: 600 }}>Prev. Balance: {money(inv.partyBalance)}</div>}
+                </div>
+                {/* Ship To (only when address filled) */}
+                {hasBillAddr && (
+                  <div style={{ padding: '18px 20px', borderRight: '1px solid #eee9df' }}>
+                    <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '1.2px', color: '#4a90d9', textTransform: 'uppercase', marginBottom: 8 }}>Ship To</div>
+                    <div style={{ fontWeight: 700, fontSize: 13, color: '#1e3d2c', marginBottom: 4 }}>{inv.customerName || '—'}</div>
+                    {inv.shipSameAsBill
+                      ? <div style={{ fontSize: 10, color: '#8a9389', fontStyle: 'italic' }}>Same as billing address</div>
+                      : hasShipAddr && <div style={{ fontSize: 11, color: '#536157', lineHeight: 1.6, whiteSpace: 'pre-line' }}>{fmtAddr(shipAddr)}</div>
+                    }
+                  </div>
+                )}
+                {/* Invoice Details */}
+                <div style={{ padding: '18px 20px' }}>
+                  <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '1.2px', color: '#a9663b', textTransform: 'uppercase', marginBottom: 8 }}>Invoice Details</div>
+                  <table style={{ width: '100%', fontSize: 11, borderCollapse: 'collapse' }}>
+                    <tbody>
+                      {[
+                        ['Invoice No.', inv.invoiceNo],
+                        ['Date', inv.date],
+                        ['Time', inv.time],
+                        ['Payment', inv.paymentType],
+                        inv.paymentRef ? ['Ref No.', inv.paymentRef] : null,
+                      ].filter((r): r is string[] => r !== null).map(([label, val], i) => (
+                        <tr key={i}>
+                          <td style={{ color: '#8a9389', paddingBottom: 4, paddingRight: 10, whiteSpace: 'nowrap' }}>{label}</td>
+                          <td style={{ color: '#2b4435', fontWeight: 600, paddingBottom: 4 }}>{val}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            );
+          })()}
 
           {/* Items Table */}
           <div style={{ padding: '0' }}>
@@ -487,7 +519,7 @@ function InvoicePreviewModal({ inv, onClose, onPrint, onShare }: { inv: SaleInvo
 // ─────────────────────── Sale Invoice Types & Components ─────────────────────
 const INVOICE_KEY='bookbazaar-invoices-v1';
 type InvoiceItem={id:string;bookId:string;name:string;qty:number;price:number;discountPct:number};
-type SaleInvoiceType={id:string;invoiceNo:string;date:string;time:string;customerName:string;billingName:string;phone:string;partyBalance:number;items:InvoiceItem[];discountPct:number;shipping:number;roundOff:boolean;received:number;paymentType:string;paymentRef:string;notes:string;terms:string;status:'Paid'|'Partial'|'Unpaid'};
+type SaleInvoiceType={id:string;invoiceNo:string;date:string;time:string;customerName:string;billingName:string;phone:string;email:string;partyBalance:number;billingAddress:{line1:string;line2:string;city:string;state:string;pincode:string};shippingAddress:{line1:string;line2:string;city:string;state:string;pincode:string};shipSameAsBill:boolean;items:InvoiceItem[];discountPct:number;shipping:number;roundOff:boolean;received:number;paymentType:string;paymentRef:string;notes:string;terms:string;status:'Paid'|'Partial'|'Unpaid'};
 function calcInvoiceTotal(inv:SaleInvoiceType){const sub=inv.items.reduce((s,i)=>s+i.qty*i.price*(1-i.discountPct/100),0);const aft=sub*(1-inv.discountPct/100)+inv.shipping;return inv.roundOff?Math.round(aft):aft;}
 function SaleInvoicePage(c:Context){
   const [invoices,setInvoices]=useState<SaleInvoiceType[]>(()=>{try{const v=localStorage.getItem(INVOICE_KEY);return v?JSON.parse(v):[];}catch{return [];}});
@@ -542,7 +574,8 @@ function SaleInvoicePage(c:Context){
   );
 }
 function InvoiceForm({data,initial,nextNo,nowTime,onSave,onClose,onDelete}:{data:Dataset;initial:SaleInvoiceType|null;nextNo:string;nowTime:string;onSave:(inv:SaleInvoiceType)=>void;onClose:()=>void;onDelete?:()=>void}){
-  const blank:Omit<SaleInvoiceType,'id'>={invoiceNo:nextNo,date:today,time:nowTime,customerName:'',billingName:'',phone:'',partyBalance:0,items:[],discountPct:0,shipping:0,roundOff:false,received:0,paymentType:'Cash',paymentRef:'',notes:'',terms:'1) Thank you for doing business with us.\n2) E. & O.E.\n3) Goods once sold will not be taken back.',status:'Unpaid'};
+  const blankAddr=()=>({line1:'',line2:'',city:'',state:'',pincode:''});
+  const blank:Omit<SaleInvoiceType,'id'>={invoiceNo:nextNo,date:today,time:nowTime,customerName:'',billingName:'',phone:'',email:'',partyBalance:0,billingAddress:blankAddr(),shippingAddress:blankAddr(),shipSameAsBill:true,items:[],discountPct:0,shipping:0,roundOff:false,received:0,paymentType:'Cash',paymentRef:'',notes:'',terms:'1) Thank you for doing business with us.\n2) E. & O.E.\n3) Goods once sold will not be taken back.',status:'Unpaid'};
   const [f,setF]=useState<Omit<SaleInvoiceType,'id'>>(initial||blank);
   const set=(k:string,v:any)=>setF(p=>({...p,[k]:v}));
   const [selBook,setSelBook]=useState('');
@@ -550,6 +583,46 @@ function InvoiceForm({data,initial,nextNo,nowTime,onSave,onClose,onDelete}:{data
   const [selPrice,setSelPrice]=useState(0);
   const [selDisc,setSelDisc]=useState(0);
   const [termsOpen,setTermsOpen]=useState(false);
+  const [selBunchKey, setSelBunchKey] = useState('');
+  const [bunchQty, setBunchQty] = useState(1);
+  const [bunchDisc, setBunchDisc] = useState(0);
+  const [bunchFeedback, setBunchFeedback] = useState('');
+
+  const allBunches: BookBunch[] = (data.bunches && data.bunches.length > 0) ? data.bunches : DEFAULT_BUNCHES;
+  const classesWithBooks = Array.from(new Set(data.books.map(b => b.className)))
+    .filter(Boolean)
+    .sort((a, b) => {
+      const numA = parseInt(a.replace(/\D/g, '') || '0', 10);
+      const numB = parseInt(b.replace(/\D/g, '') || '0', 10);
+      return numA - numB;
+    });
+
+  const selectedBunchBooks: Book[] = useMemo(() => {
+    if (!selBunchKey) return [];
+    if (selBunchKey.startsWith('CLASS_')) {
+      const clsName = selBunchKey.replace('CLASS_', '');
+      return data.books.filter(b => b.className === clsName);
+    }
+    const found = allBunches.find(b => b.id === selBunchKey);
+    return found ? (found.bookIds.map(id => data.books.find(b => b.id === id)).filter(Boolean) as Book[]) : [];
+  }, [selBunchKey, allBunches, data.books]);
+
+  const addBunchItems = () => {
+    if (!selectedBunchBooks.length) return;
+    const newItems: InvoiceItem[] = selectedBunchBooks.map(bk => ({
+      id: idFor('ITM'),
+      bookId: bk.id,
+      name: bk.title,
+      qty: bunchQty,
+      price: bk.price,
+      discountPct: bunchDisc
+    }));
+    set('items', [...f.items, ...newItems]);
+    const addedCount = newItems.length;
+    setBunchFeedback(`✓ Added ${addedCount} book(s) from bunch to invoice!`);
+    setTimeout(() => setBunchFeedback(''), 2500);
+    setSelBunchKey('');
+  };
   const itemsSub=f.items.reduce((s,i)=>s+i.qty*i.price*(1-i.discountPct/100),0);
   const afterDisc=itemsSub*(1-f.discountPct/100);
   const withShip=afterDisc+f.shipping;
@@ -586,9 +659,60 @@ function InvoiceForm({data,initial,nextNo,nowTime,onSave,onClose,onDelete}:{data
           <h2 style={{fontFamily:'var(--app-font-serif)',fontSize:16,margin:0,color:'#264333'}}>Customer Details</h2>
           {f.partyBalance>0&&<span style={{fontSize:12,color:'#3a6647',fontWeight:600}}>Party Balance: {money(f.partyBalance)}</span>}
         </div>
-        <div className="field" style={{marginBottom:10}}><label>Customer Name *</label><input required value={f.customerName} onChange={e=>{set('customerName',e.target.value);if(!f.billingName||f.billingName===f.customerName)set('billingName',e.target.value);}} placeholder="Customer name"/></div>
-        <div className="field" style={{marginBottom:10}}><label>Billing Name (Optional)</label><input value={f.billingName} onChange={e=>set('billingName',e.target.value)} placeholder="Same as customer name"/></div>
-        <div className="field"><label>Phone Number</label><input value={f.phone} onChange={e=>set('phone',e.target.value)} placeholder="+91 00000 00000"/></div>
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:14,marginBottom:10}}>
+          <div className="field"><label>Customer Name *</label><input required value={f.customerName} onChange={e=>{set('customerName',e.target.value);if(!f.billingName||f.billingName===f.customerName)set('billingName',e.target.value);}} placeholder="Customer name"/></div>
+          <div className="field"><label>Billing Name (Optional)</label><input value={f.billingName} onChange={e=>set('billingName',e.target.value)} placeholder="Same as customer name"/></div>
+        </div>
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:14,marginBottom:10}}>
+          <div className="field"><label>Phone Number</label><input value={f.phone} onChange={e=>set('phone',e.target.value)} placeholder="+91 00000 00000"/></div>
+          <div className="field"><label>Email Address</label><input type="email" value={f.email} onChange={e=>set('email',e.target.value)} placeholder="customer@email.com"/></div>
+        </div>
+
+        {/* Billing Address */}
+        <div style={{marginTop:4,marginBottom:14}}>
+          <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:10}}>
+            <div style={{width:3,height:16,background:'#244c38',borderRadius:2}}/>
+            <span style={{fontSize:12,fontWeight:700,color:'#264333',letterSpacing:'0.4px',textTransform:'uppercase'}}>Billing Address</span>
+          </div>
+          <div className="field" style={{marginBottom:10}}><label>Address Line 1</label><input value={f.billingAddress.line1} onChange={e=>set('billingAddress',{...f.billingAddress,line1:e.target.value})} placeholder="House / Flat no., Building name"/></div>
+          <div className="field" style={{marginBottom:10}}><label>Address Line 2 (Optional)</label><input value={f.billingAddress.line2} onChange={e=>set('billingAddress',{...f.billingAddress,line2:e.target.value})} placeholder="Street, Area, Locality"/></div>
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:14}}>
+            <div className="field"><label>City</label><input value={f.billingAddress.city} onChange={e=>set('billingAddress',{...f.billingAddress,city:e.target.value})} placeholder="City"/></div>
+            <div className="field"><label>State</label><input value={f.billingAddress.state} onChange={e=>set('billingAddress',{...f.billingAddress,state:e.target.value})} placeholder="State"/></div>
+            <div className="field"><label>PIN Code</label><input value={f.billingAddress.pincode} onChange={e=>set('billingAddress',{...f.billingAddress,pincode:e.target.value})} placeholder="110001" maxLength={6}/></div>
+          </div>
+        </div>
+
+        {/* Shipping Address */}
+        <div style={{marginTop:4}}>
+          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:10}}>
+            <div style={{display:'flex',alignItems:'center',gap:8}}>
+              <div style={{width:3,height:16,background:'#4a90d9',borderRadius:2}}/>
+              <span style={{fontSize:12,fontWeight:700,color:'#264333',letterSpacing:'0.4px',textTransform:'uppercase'}}>Shipping Address</span>
+            </div>
+            <label style={{display:'flex',alignItems:'center',gap:7,cursor:'pointer',fontSize:12,color:'#536157',fontWeight:500}}>
+              <input type="checkbox" checked={f.shipSameAsBill} onChange={e=>set('shipSameAsBill',e.target.checked)} style={{accentColor:'#315a41',width:14,height:14}}/>
+              Same as billing address
+            </label>
+          </div>
+          {!f.shipSameAsBill&&(
+            <>
+              <div className="field" style={{marginBottom:10}}><label>Address Line 1</label><input value={f.shippingAddress.line1} onChange={e=>set('shippingAddress',{...f.shippingAddress,line1:e.target.value})} placeholder="House / Flat no., Building name"/></div>
+              <div className="field" style={{marginBottom:10}}><label>Address Line 2 (Optional)</label><input value={f.shippingAddress.line2} onChange={e=>set('shippingAddress',{...f.shippingAddress,line2:e.target.value})} placeholder="Street, Area, Locality"/></div>
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:14}}>
+                <div className="field"><label>City</label><input value={f.shippingAddress.city} onChange={e=>set('shippingAddress',{...f.shippingAddress,city:e.target.value})} placeholder="City"/></div>
+                <div className="field"><label>State</label><input value={f.shippingAddress.state} onChange={e=>set('shippingAddress',{...f.shippingAddress,state:e.target.value})} placeholder="State"/></div>
+                <div className="field"><label>PIN Code</label><input value={f.shippingAddress.pincode} onChange={e=>set('shippingAddress',{...f.shippingAddress,pincode:e.target.value})} placeholder="110001" maxLength={6}/></div>
+              </div>
+            </>
+          )}
+          {f.shipSameAsBill&&(
+            <div style={{background:'#f4f1e8',border:'1px solid #e7e1d4',borderRadius:8,padding:'10px 14px',fontSize:12,color:'#8a9389',display:'flex',alignItems:'center',gap:8}}>
+              <Check size={13} style={{color:'#3a6647',flexShrink:0}}/>
+              Shipping to the same address as billing
+            </div>
+          )}
+        </div>
       </section>
       <section className="panel" style={{marginBottom:14}}>
         <div style={{background:'#4a90d9',borderRadius:'12px 12px 0 0',padding:'12px 18px',display:'flex',alignItems:'center',gap:8,color:'#fff',fontWeight:600,fontSize:13}}><BookOpen size={15}/> Billed Items ({f.items.length})</div>
@@ -610,15 +734,126 @@ function InvoiceForm({data,initial,nextNo,nowTime,onSave,onClose,onDelete}:{data
               </div>
             </div>
           ))}
-          <div style={{border:'1.5px dashed #c5c0b4',borderRadius:9,padding:14,background:'#f9f8f3'}}>
-            <div style={{fontSize:10,fontWeight:700,color:'#8a9389',letterSpacing:'0.8px',marginBottom:10}}>ADD ITEM</div>
-            <div style={{display:'grid',gridTemplateColumns:'2fr 0.7fr 1fr 0.7fr auto',gap:8,alignItems:'flex-end'}}>
-              <div className="field" style={{marginBottom:0,gap:3}}><label style={{fontSize:9}}>BOOK</label><select value={selBook} onChange={e=>{setSelBook(e.target.value);const b=data.books.find(b=>b.id===e.target.value);if(b)setSelPrice(b.price);}} style={{height:34}}><option value="">Select book…</option>{data.books.map(b=><option key={b.id} value={b.id}>{b.title}</option>)}</select></div>
-              <div className="field" style={{marginBottom:0,gap:3}}><label style={{fontSize:9}}>QTY</label><input type="number" min="1" value={selQty} style={{height:34}} onChange={e=>setSelQty(Number(e.target.value))}/></div>
-              <div className="field" style={{marginBottom:0,gap:3}}><label style={{fontSize:9}}>PRICE (₹)</label><input type="number" min="0" value={selPrice} style={{height:34}} onChange={e=>setSelPrice(Number(e.target.value))}/></div>
-              <div className="field" style={{marginBottom:0,gap:3}}><label style={{fontSize:9}}>DISC %</label><input type="number" min="0" max="100" value={selDisc} style={{height:34}} onChange={e=>setSelDisc(Number(e.target.value))}/></div>
-              <button className="btn primary" style={{height:34,padding:'0 12px'}} onClick={addItem}><Plus size={13}/></button>
+          <div style={{border:'1.5px dashed #c5c0b4',borderRadius:9,padding:16,background:'#f9f8f3'}}>
+            {/* Single Book Item Section */}
+            <div style={{marginBottom:14}}>
+              <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:8}}>
+                <BookOpen size={13} style={{color:'#264333'}}/>
+                <span style={{fontSize:11,fontWeight:700,color:'#264333',letterSpacing:'0.5px',textTransform:'uppercase'}}>
+                  Add Single Book Item
+                </span>
+              </div>
+              <div style={{display:'grid',gridTemplateColumns:'2fr 0.7fr 1fr 0.7fr auto',gap:8,alignItems:'flex-end'}}>
+                <div className="field" style={{marginBottom:0,gap:3}}>
+                  <label style={{fontSize:9,fontWeight:700,color:'#6f786f'}}>BOOK</label>
+                  <select value={selBook} onChange={e=>{setSelBook(e.target.value);const b=data.books.find(b=>b.id===e.target.value);if(b)setSelPrice(b.price);}} style={{height:34}}>
+                    <option value="">Select book…</option>
+                    {data.books.map(b=><option key={b.id} value={b.id}>{b.title} ({b.className} · ₹{b.price})</option>)}
+                  </select>
+                </div>
+                <div className="field" style={{marginBottom:0,gap:3}}>
+                  <label style={{fontSize:9,fontWeight:700,color:'#6f786f'}}>QTY</label>
+                  <input type="number" min="1" value={selQty} style={{height:34}} onChange={e=>setSelQty(Number(e.target.value))}/>
+                </div>
+                <div className="field" style={{marginBottom:0,gap:3}}>
+                  <label style={{fontSize:9,fontWeight:700,color:'#6f786f'}}>PRICE (₹)</label>
+                  <input type="number" min="0" value={selPrice} style={{height:34}} onChange={e=>setSelPrice(Number(e.target.value))}/>
+                </div>
+                <div className="field" style={{marginBottom:0,gap:3}}>
+                  <label style={{fontSize:9,fontWeight:700,color:'#6f786f'}}>DISC %</label>
+                  <input type="number" min="0" max="100" value={selDisc} style={{height:34}} onChange={e=>setSelDisc(Number(e.target.value))}/>
+                </div>
+                <button type="button" className="btn primary" style={{height:34,padding:'0 14px',display:'flex',alignItems:'center',gap:5}} onClick={addItem} disabled={!selBook}>
+                  <Plus size={14}/> Add Book
+                </button>
+              </div>
             </div>
+
+            {/* Visual Divider between Single Book and Bunch Option */}
+            <div style={{display:'flex',alignItems:'center',gap:10,margin:'14px 0'}}>
+              <div style={{flex:1,height:1,background:'#d5cfc3'}}/>
+              <span style={{fontSize:10,fontWeight:700,color:'#6d786d',letterSpacing:'0.8px',textTransform:'uppercase',background:'#eae6db',padding:'2px 8px',borderRadius:4}}>
+                OR ADD BUNCH OF BOOKS
+              </span>
+              <div style={{flex:1,height:1,background:'#d5cfc3'}}/>
+            </div>
+
+            {/* Bunch Option Section */}
+            <div style={{background:'#fff',padding:12,borderRadius:8,border:'1px solid #dcd7ca'}}>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8,flexWrap:'wrap',gap:6}}>
+                <div style={{display:'flex',alignItems:'center',gap:6}}>
+                  <Boxes size={14} style={{color:'#3a6647'}}/>
+                  <span style={{fontSize:11,fontWeight:700,color:'#264333',letterSpacing:'0.4px',textTransform:'uppercase'}}>
+                    Bunch Option (Full Set / Kit)
+                  </span>
+                </div>
+                <span style={{fontSize:10,color:'#8a9389'}}>Directly adds all books in the bunch into billed items</span>
+              </div>
+              <div style={{display:'grid',gridTemplateColumns:'2.5fr 0.7fr 0.7fr auto',gap:8,alignItems:'flex-end'}}>
+                <div className="field" style={{marginBottom:0,gap:3}}>
+                  <label style={{fontSize:9,fontWeight:700,color:'#6f786f'}}>CHOOSE BUNCH / CLASS SET</label>
+                  <select value={selBunchKey} onChange={e=>setSelBunchKey(e.target.value)} style={{height:34}}>
+                    <option value="">-- Choose a Book Bunch --</option>
+                    <optgroup label="📦 Pre-configured Bunches">
+                      {allBunches.map(bn => (
+                        <option key={bn.id} value={bn.id}>
+                          {bn.name} ({bn.bookIds.length} titles · {bn.className})
+                        </option>
+                      ))}
+                    </optgroup>
+                    <optgroup label="⚡ Quick Class Sets (All titles in Class)">
+                      {classesWithBooks.map(cls => (
+                        <option key={`CLASS_${cls}`} value={`CLASS_${cls}`}>
+                          ⚡ All {cls} Books ({data.books.filter(b=>b.className===cls).length} titles)
+                        </option>
+                      ))}
+                    </optgroup>
+                  </select>
+                </div>
+                <div className="field" style={{marginBottom:0,gap:3}}>
+                  <label style={{fontSize:9,fontWeight:700,color:'#6f786f'}}>QTY EACH</label>
+                  <input type="number" min="1" value={bunchQty} style={{height:34}} onChange={e=>setBunchQty(Number(e.target.value))}/>
+                </div>
+                <div className="field" style={{marginBottom:0,gap:3}}>
+                  <label style={{fontSize:9,fontWeight:700,color:'#6f786f'}}>DISC %</label>
+                  <input type="number" min="0" max="100" value={bunchDisc} style={{height:34}} onChange={e=>setBunchDisc(Number(e.target.value))}/>
+                </div>
+                <button
+                  type="button"
+                  className="btn primary"
+                  style={{height:34,padding:'0 16px',display:'flex',alignItems:'center',gap:6,whiteSpace:'nowrap',background:'#244331'}}
+                  disabled={!selectedBunchBooks.length}
+                  onClick={addBunchItems}
+                >
+                  <Boxes size={14}/> Add Bunch ({selectedBunchBooks.length} books)
+                </button>
+              </div>
+
+              {/* Bunch Contents Preview */}
+              {selectedBunchBooks.length > 0 && (
+                <div style={{marginTop:10,padding:'8px 10px',background:'#f8f7f2',border:'1px solid #ebe5d8',borderRadius:6,fontSize:11}}>
+                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:4}}>
+                    <span style={{fontWeight:600,color:'#264333'}}>Bunch contents ({selectedBunchBooks.length} titles):</span>
+                    <span style={{fontWeight:700,color:'#3a6647'}}>
+                      Combined Total: ₹{(selectedBunchBooks.reduce((sum,b)=>sum+(b.price||0),0) * bunchQty * (1 - bunchDisc/100)).toLocaleString('en-IN')}
+                    </span>
+                  </div>
+                  <div style={{display:'flex',gap:5,flexWrap:'wrap'}}>
+                    {selectedBunchBooks.map(b=>(
+                      <span key={b.id} style={{background:'#fff',border:'1px solid #d5cfc3',borderRadius:4,padding:'2px 6px',fontSize:10,color:'#445247'}}>
+                        {b.title} <span style={{color:'#778279'}}>({b.className} · ₹{b.price})</span>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {bunchFeedback && (
+              <div style={{marginTop:10,fontSize:11,color:'#245a33',fontWeight:600,background:'#eaf5ec',padding:'6px 12px',borderRadius:6}}>
+                {bunchFeedback}
+              </div>
+            )}
           </div>
         </div>
       </section>
@@ -2580,6 +2815,396 @@ function PartiesPage({ data }: { data: Dataset }) {
   );
 }
 
+/* ─── Customer / Student Purchase Portal ───────────────────────────── */
+function CustomerPortal({ data }: { data: Dataset }) {
+  const [currentUser, setCurrentUser] = useState<Customer | null>(() => {
+    const savedId = sessionStorage.getItem('bookbazaar-current-student-id');
+    return savedId ? (data.customers.find(c => c.id === savedId) || null) : null;
+  });
+  const [loginIdentifier, setLoginIdentifier] = useState('');
+  const [password, setPassword] = useState('');
+  const [loginError, setLoginError] = useState('');
+  const [selectedBooks, setSelectedBooks] = useState<string[]>([]);
+  const [orderNotice, setOrderNotice] = useState('');
+  const [paymentMode, setPaymentMode] = useState('UPI');
+
+  const handleLogin = (e: FormEvent) => {
+    e.preventDefault();
+    setLoginError('');
+    const input = loginIdentifier.trim().toLowerCase();
+    const pass = password.trim();
+    const found = data.customers.find(c =>
+      (c.email.toLowerCase() === input || (c.loginId && c.loginId.toLowerCase() === input) || c.id.toLowerCase() === input) &&
+      (c.password === pass || (!c.password && pass === 'Book@123') || pass === `${c.name.split(' ')[0]}@123`)
+    );
+    if (!found) {
+      setLoginError('Invalid Email / Login ID or Password. Please check with your school bookstore.');
+      return;
+    }
+    setCurrentUser(found);
+    sessionStorage.setItem('bookbazaar-current-student-id', found.id);
+  };
+
+  const handleLogout = () => {
+    setCurrentUser(null);
+    sessionStorage.removeItem('bookbazaar-current-student-id');
+  };
+
+  // Determine which books are assigned to this student
+  const assignedBooks = useMemo(() => {
+    if (!currentUser) return [];
+    if (currentUser.allowedBooks && currentUser.allowedBooks.length > 0) {
+      return currentUser.allowedBooks.map(id => data.books.find(b => b.id === id)).filter(Boolean) as Book[];
+    }
+    // Fallback: match by class or publications
+    return data.books.filter(b => b.className === currentUser.className || currentUser.allowedPublications.includes(b.publication));
+  }, [currentUser, data.books]);
+
+  // Default select all assigned books when logged in
+  useEffect(() => {
+    if (currentUser && assignedBooks.length > 0 && selectedBooks.length === 0) {
+      setSelectedBooks(assignedBooks.map(b => b.id));
+    }
+  }, [currentUser, assignedBooks]);
+
+  const selectedTotal = useMemo(() => {
+    return selectedBooks.reduce((sum, bid) => {
+      const bk = data.books.find(b => b.id === bid);
+      return sum + (bk?.price || 0);
+    }, 0);
+  }, [selectedBooks, data.books]);
+
+  const handlePlaceOrder = () => {
+    if (!currentUser || selectedBooks.length === 0) return;
+    const invItems: InvoiceItem[] = selectedBooks.map(bid => {
+      const bk = data.books.find(b => b.id === bid);
+      return {
+        id: idFor('ITM'),
+        bookId: bid,
+        name: bk?.title || bid,
+        qty: 1,
+        price: bk?.price || 0,
+        discountPct: 0
+      };
+    });
+
+    const newInvoice: SaleInvoiceType = {
+      id: idFor('INV'),
+      invoiceNo: `INV-${Math.floor(1000 + Math.random() * 9000)}`,
+      date: today,
+      time: new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true }),
+      customerName: currentUser.name,
+      billingName: currentUser.name,
+      phone: currentUser.phone,
+      email: currentUser.email,
+      partyBalance: currentUser.amountDue || 0,
+      billingAddress: { line1: currentUser.school, line2: currentUser.className, city: 'Delhi', state: 'Delhi', pincode: '110001' },
+      shippingAddress: { line1: currentUser.school, line2: currentUser.className, city: 'Delhi', state: 'Delhi', pincode: '110001' },
+      shipSameAsBill: true,
+      items: invItems,
+      discountPct: 0,
+      shipping: 0,
+      roundOff: false,
+      received: paymentMode === 'Cash on Delivery' ? 0 : selectedTotal,
+      paymentType: paymentMode,
+      paymentRef: paymentMode === 'UPI' ? `UPI-${Math.random().toString(36).slice(2, 8).toUpperCase()}` : '',
+      notes: `Student portal order placed by ${currentUser.name} for ${currentUser.className}`,
+      terms: 'Thank you for your order. School pack will be dispatched directly to your student desk.',
+      status: paymentMode === 'Cash on Delivery' ? 'Unpaid' : 'Paid'
+    };
+
+    try {
+      const existingInvoices: SaleInvoiceType[] = JSON.parse(localStorage.getItem('bookbazaar-invoices-v1') || '[]');
+      localStorage.setItem('bookbazaar-invoices-v1', JSON.stringify([newInvoice, ...existingInvoices]));
+    } catch {}
+
+    setOrderNotice(`🎉 Order successfully placed for ${invItems.length} books! Invoice ${newInvoice.invoiceNo} has been generated.`);
+  };
+
+  // Past student invoices
+  const studentInvoices = useMemo(() => {
+    if (!currentUser) return [];
+    try {
+      const all: SaleInvoiceType[] = JSON.parse(localStorage.getItem('bookbazaar-invoices-v1') || '[]');
+      return all.filter(inv => inv.customerName.toLowerCase() === currentUser.name.toLowerCase() || inv.phone === currentUser.phone || inv.email === currentUser.email);
+    } catch {
+      return [];
+    }
+  }, [currentUser, orderNotice]);
+
+  return (
+    <div style={{ minHeight: '100vh', background: '#f5f3ec', color: '#1e3d2c', fontFamily: 'var(--app-font-sans)' }}>
+      {/* Top Navbar */}
+      <header style={{ background: '#1c3829', color: '#fff', padding: '14px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div style={{ width: 34, height: 34, borderRadius: 8, background: '#e8ddcb', color: '#1c3829', fontWeight: 900, display: 'grid', placeItems: 'center', fontSize: 18 }}>b</div>
+          <div>
+            <div style={{ fontSize: 16, fontWeight: 700, letterSpacing: '0.3px' }}>Book Bazaar</div>
+            <div style={{ fontSize: 10, color: '#a6c0b0', letterSpacing: '1px', textTransform: 'uppercase' }}>Student & Family Purchase Portal</div>
+          </div>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          {currentUser && (
+            <div style={{ textAlign: 'right', marginRight: 10 }}>
+              <div style={{ fontSize: 13, fontWeight: 700 }}>{currentUser.name}</div>
+              <div style={{ fontSize: 10, color: '#9bc4a8' }}>{currentUser.school} · {currentUser.className}</div>
+            </div>
+          )}
+          {currentUser ? (
+            <button onClick={handleLogout} className="btn" style={{ background: '#29543c', color: '#fff', border: '1px solid #3c7353', fontSize: 11, padding: '6px 12px', display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer' }}>
+              <LogOut size={13}/> Log Out
+            </button>
+          ) : null}
+          <Link href="/" className="btn" style={{ background: '#fff', color: '#1c3829', border: 'none', fontSize: 11, fontWeight: 700, padding: '6px 14px', textDecoration: 'none' }}>
+            Store Workspace →
+          </Link>
+        </div>
+      </header>
+
+      {/* Main Content Area */}
+      <main style={{ maxWidth: 900, margin: '24px auto', padding: '0 16px' }}>
+        {!currentUser ? (
+          /* Login Screen */
+          <div style={{ maxWidth: 440, margin: '40px auto', background: '#fff', borderRadius: 14, border: '1px solid #e5ded2', padding: 28, boxShadow: '0 10px 30px rgba(0,0,0,0.06)' }}>
+            <div style={{ textAlign: 'center', marginBottom: 22 }}>
+              <div style={{ width: 48, height: 48, borderRadius: 24, background: '#eef5f0', color: '#244331', margin: '0 auto 12px', display: 'grid', placeItems: 'center' }}>
+                <GraduationCap size={26}/>
+              </div>
+              <h1 style={{ fontSize: 22, fontWeight: 700, color: '#1c3829', margin: '0 0 6px', fontFamily: 'var(--app-font-serif)' }}>Student & Parent Login</h1>
+              <p style={{ fontSize: 12, color: '#6d756e', margin: 0 }}>
+                Sign in with your Email ID or Login ID and Password to purchase your child's assigned school books.
+              </p>
+            </div>
+
+            {loginError && (
+              <div style={{ background: '#fdf2f2', border: '1px solid #f8b4b4', color: '#9b1c1c', borderRadius: 8, padding: '10px 14px', fontSize: 12, marginBottom: 16 }}>
+                {loginError}
+              </div>
+            )}
+
+            <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <div className="field">
+                <label style={{ fontSize: 11, fontWeight: 700, color: '#4a574d' }}>EMAIL ADDRESS OR LOGIN ID *</label>
+                <input
+                  required
+                  placeholder="e.g. aarav.mehta@gmail.com or aarav.mehta"
+                  value={loginIdentifier}
+                  onChange={e => setLoginIdentifier(e.target.value)}
+                  style={{ height: 38, fontSize: 13 }}
+                />
+              </div>
+              <div className="field">
+                <label style={{ fontSize: 11, fontWeight: 700, color: '#4a574d' }}>PASSWORD *</label>
+                <input
+                  required
+                  type="password"
+                  placeholder="Enter your customer password"
+                  value={password}
+                  onChange={e => setPassword(e.target.value)}
+                  style={{ height: 38, fontSize: 13 }}
+                />
+              </div>
+              <button type="submit" className="btn primary" style={{ height: 42, fontSize: 14, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 4 }}>
+                <LogIn size={15}/> Log In to Purchase Books
+              </button>
+            </form>
+
+            {/* Quick Demo Login Pills for Instant Testing */}
+            <div style={{ marginTop: 24, paddingTop: 18, borderTop: '1px solid #eee9df' }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: '#8a9389', textTransform: 'uppercase', marginBottom: 10, textAlign: 'center' }}>
+                Quick Test Accounts (Click to Fill & Sign In):
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {data.customers.slice(0, 3).map(c => (
+                  <button
+                    key={c.id}
+                    type="button"
+                    onClick={() => {
+                      setLoginIdentifier(c.loginId || c.email);
+                      setPassword(c.password || 'Aarav@123');
+                      setCurrentUser(c);
+                      sessionStorage.setItem('bookbazaar-current-student-id', c.id);
+                    }}
+                    style={{ background: '#f8f6f0', border: '1px solid #e2ded2', borderRadius: 7, padding: '7px 12px', textAlign: 'left', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+                  >
+                    <div>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: '#244331' }}>{c.name} ({c.className})</div>
+                      <div style={{ fontSize: 10, color: '#7a857b' }}>ID: {c.loginId || c.email.split('@')[0]} · Pass: {c.password || 'Book@123'}</div>
+                    </div>
+                    <span style={{ fontSize: 10, color: '#3a6647', fontWeight: 600 }}>Login →</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        ) : (
+          /* Student Dashboard & Purchase Screen */
+          <div>
+            {/* Student Banner */}
+            <div style={{ background: '#fff', border: '1px solid #e5ded2', borderRadius: 12, padding: 20, marginBottom: 20, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 14 }}>
+              <div>
+                <span style={{ fontSize: 11, color: '#8a9389', fontWeight: 700, letterSpacing: '0.8px', textTransform: 'uppercase' }}>STUDENT ACCOUNT</span>
+                <h1 style={{ fontSize: 24, fontWeight: 700, color: '#1c3829', margin: '2px 0 4px', fontFamily: 'var(--app-font-serif)' }}>{currentUser.name}</h1>
+                <div style={{ fontSize: 12, color: '#556358' }}>
+                  <b>School:</b> {currentUser.school} &nbsp;|&nbsp; <b>Class:</b> {currentUser.className} &nbsp;|&nbsp; <b>Login ID:</b> <code style={{ background: '#f0efe6', padding: '1px 5px', borderRadius: 4 }}>{currentUser.loginId || currentUser.email}</code>
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: 12 }}>
+                <div style={{ background: '#f6f9f6', border: '1px solid #c9ddcd', padding: '10px 16px', borderRadius: 8, textAlign: 'center' }}>
+                  <div style={{ fontSize: 10, color: '#59685c', fontWeight: 700 }}>AMOUNT PAID</div>
+                  <div style={{ fontSize: 16, fontWeight: 800, color: '#244331' }}>{money(currentUser.amountPaid || 0)}</div>
+                </div>
+                {(currentUser.amountDue || 0) > 0 && (
+                  <div style={{ background: '#fdf3f3', border: '1px solid #f2c7c7', padding: '10px 16px', borderRadius: 8, textAlign: 'center' }}>
+                    <div style={{ fontSize: 10, color: '#a24840', fontWeight: 700 }}>OUTSTANDING DUE</div>
+                    <div style={{ fontSize: 16, fontWeight: 800, color: '#a24840' }}>{money(currentUser.amountDue || 0)}</div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {orderNotice && (
+              <div style={{ background: '#eaf5ec', border: '1px solid #a3cfb0', color: '#1f482d', padding: '12px 16px', borderRadius: 9, marginBottom: 20, display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 600 }}>
+                <Check size={16}/> {orderNotice}
+              </div>
+            )}
+
+            {/* Assigned Books Section */}
+            <div style={{ background: '#fff', border: '1px solid #e5ded2', borderRadius: 12, padding: 22, marginBottom: 20 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+                <div>
+                  <h2 style={{ fontSize: 18, fontWeight: 700, color: '#1c3829', margin: 0, fontFamily: 'var(--app-font-serif)' }}>
+                    📚 Books Assigned to You ({assignedBooks.length})
+                  </h2>
+                  <p style={{ fontSize: 12, color: '#7a857b', margin: '3px 0 0' }}>
+                    Select the titles you want to purchase. The bookshop will prepare and deliver your package.
+                  </p>
+                </div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedBooks(assignedBooks.map(b => b.id))}
+                    style={{ background: '#f0efe6', border: '1px solid #dcd7ca', borderRadius: 6, padding: '5px 10px', fontSize: 11, fontWeight: 600, color: '#264333', cursor: 'pointer' }}
+                  >
+                    Select All
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedBooks([])}
+                    style={{ background: 'none', border: 'none', fontSize: 11, color: '#a24840', cursor: 'pointer', textDecoration: 'underline' }}
+                  >
+                    Clear
+                  </button>
+                </div>
+              </div>
+
+              {assignedBooks.length === 0 ? (
+                <div style={{ padding: 24, textAlign: 'center', color: '#8a9389', fontSize: 13 }}>
+                  No specific titles have been restricted for your account. You can purchase any class titles directly.
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {assignedBooks.map(b => {
+                    const isSelected = selectedBooks.includes(b.id);
+                    return (
+                      <div
+                        key={b.id}
+                        onClick={() => setSelectedBooks(prev => isSelected ? prev.filter(x => x !== b.id) : [...prev, b.id])}
+                        style={{
+                          border: isSelected ? '1.5px solid #244331' : '1px solid #e6e0d3',
+                          background: isSelected ? '#f8faf8' : '#faf9f5',
+                          borderRadius: 9,
+                          padding: '12px 16px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 14,
+                          cursor: 'pointer',
+                          transition: 'all 0.15s'
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => {}}
+                          style={{ width: 18, height: 18, accentColor: '#244331', cursor: 'pointer' }}
+                        />
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontSize: 14, fontWeight: 700, color: '#1e3d2c' }}>{b.title}</div>
+                          <div style={{ fontSize: 11, color: '#7a857b', marginTop: 2 }}>
+                            {b.author} · {b.publication} · <span style={{ background: '#e8e6dc', padding: '1px 5px', borderRadius: 4 }}>{b.className}</span>
+                          </div>
+                        </div>
+                        <div style={{ textAlign: 'right' }}>
+                          <div style={{ fontSize: 16, fontWeight: 800, color: '#1c3829' }}>{money(b.price)}</div>
+                          <div style={{ fontSize: 10, color: b.stock > 0 ? '#3a6647' : '#a24840', fontWeight: 600 }}>
+                            {b.stock > 0 ? '✓ In Stock' : 'Pre-order'}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Checkout / Order Summary Box */}
+              {selectedBooks.length > 0 && (
+                <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid #e5ded2', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 14 }}>
+                  <div>
+                    <div style={{ fontSize: 11, color: '#8a9389', fontWeight: 600 }}>ORDER TOTAL ({selectedBooks.length} items):</div>
+                    <div style={{ fontSize: 24, fontWeight: 800, color: '#244331' }}>{money(selectedTotal)}</div>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                    <select
+                      value={paymentMode}
+                      onChange={e => setPaymentMode(e.target.value)}
+                      style={{ padding: '8px 12px', borderRadius: 7, border: '1px solid #d5cfc3', fontSize: 12, background: '#fff', color: '#1e3d2c', fontWeight: 600 }}
+                    >
+                      <option value="UPI">Pay via UPI (Instant)</option>
+                      <option value="Cash on Delivery">Pay at Bookshop Counter (COD)</option>
+                      <option value="Net Banking">Net Banking / Card</option>
+                    </select>
+                    <button
+                      type="button"
+                      onClick={handlePlaceOrder}
+                      className="btn primary"
+                      style={{ padding: '10px 22px', fontSize: 13, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 7 }}
+                    >
+                      <ShoppingBag size={15}/> Place Book Order Now
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Invoices & Order History */}
+            {studentInvoices.length > 0 && (
+              <div style={{ background: '#fff', border: '1px solid #e5ded2', borderRadius: 12, padding: 22 }}>
+                <h3 style={{ fontSize: 16, fontWeight: 700, color: '#1c3829', margin: '0 0 12px', fontFamily: 'var(--app-font-serif)' }}>
+                  🧾 Your Invoices & Past Orders ({studentInvoices.length})
+                </h3>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {studentInvoices.map(inv => (
+                    <div key={inv.id} style={{ border: '1px solid #e8e4da', borderRadius: 8, padding: '10px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: '#1e3d2c' }}>Invoice {inv.invoiceNo}</div>
+                        <div style={{ fontSize: 11, color: '#8a9389' }}>{inv.date} · {inv.items.length} titles · Paid via {inv.paymentType}</div>
+                      </div>
+                      <div style={{ textAlign: 'right' }}>
+                        <div style={{ fontSize: 14, fontWeight: 700, color: '#1c3829' }}>{money(calcInvoiceTotal(inv))}</div>
+                        <span className={`pill ${inv.status === 'Paid' ? '' : 'warn'}`} style={{ fontSize: 9 }}>{inv.status}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </main>
+    </div>
+  );
+}
+
 function AppShell({children}:{children:ReactNode}) {
   const [location]=useLocation(); const [menu,setMenu]=useState(false); const [saleOpen,setSaleOpen]=useState(()=>location.startsWith('/sale'));
   const [purchaseOpen,setPurchaseOpen]=useState(()=>location.startsWith('/purchase'));
@@ -2624,7 +3249,7 @@ function AppShell({children}:{children:ReactNode}) {
       <div className="sidebar-bottom">The school bookshop<br/>Every title, in good hands.</div>
     </aside>
     <div className="workspace">
-      <header className="topbar"><div className="top-left"><button className="menu-button" onClick={()=>setMenu(!menu)} aria-label="Toggle menu" data-testid="button-menu">{menu?<X/>:<Menu/>}</button><span className="crumb">Book Bazaar&nbsp;/&nbsp;<b>{allPages[location]||'Workspace'}</b></span></div><div className="top-actions"><span className="today">Friday, 14 February</span><Bell size={16}/><div className="avatar">S</div><span>Store team</span></div></header>
+      <header className="topbar"><div className="top-left"><button className="menu-button" onClick={()=>setMenu(!menu)} aria-label="Toggle menu" data-testid="button-menu">{menu?<X/>:<Menu/>}</button><span className="crumb">Book Bazaar&nbsp;/&nbsp;<b>{allPages[location]||'Workspace'}</b></span></div><div className="top-actions"><Link href="/portal" style={{display:'flex',alignItems:'center',gap:5,background:'#244331',color:'#fff',padding:'5px 11px',borderRadius:7,fontSize:11,fontWeight:600,textDecoration:'none',marginRight:6}}><GraduationCap size={13}/> Student Portal</Link><span className="today">Friday, 14 February</span><Bell size={16}/><div className="avatar">S</div><span>Store team</span></div></header>
       {children}
     </div>
     <nav className="mobile-nav"><div className="mobile-nav-inner">{mobileNav.slice(0,6).map(({to,label,Icon})=><Link key={to} href={to} className={(location===to||(to==='/sale/invoice'&&isSaleActive))?'active':''}><Icon/><span>{label}</span></Link>)}</div></nav>
@@ -2648,7 +3273,9 @@ function AppContent(){
   const endOffer=(id:string)=>{setData(d=>({...d,offers:d.offers.map(o=>o.id===id?{...o,status:'Ended'}:o)}));setToast('Offer ended');};
   const remove=()=>{if(!confirm)return;const {kind,id}=confirm;setData(d=>({...d,[kind==='customer'?'customers':kind==='book'?'books':kind==='offer'?'offers':'purchases']:d[kind==='customer'?'customers':kind==='book'?'books':kind==='offer'?'offers':'purchases'].filter((x:any)=>x.id!==id)}));setToast(`${kind==='customer'?'Customer':kind==='book'?'Book':kind==='offer'?'Offer':'Purchase'} removed`);setConfirm(null);};
   const edit=(kind:'customer'|'book'|'offer'|'purchase',item?:Customer|Book|Offer|Purchase)=>setForm({kind,item});
-  const context={data,setForm,edit,setConfirm,setToast,endOffer,pubs};
+  const saveBunch=(bunch:BookBunch)=>{setData(d=>{const list=d.bunches||DEFAULT_BUNCHES;const exists=list.some(b=>b.id===bunch.id);const bunches=exists?list.map(b=>b.id===bunch.id?bunch:b):[bunch,...list];return {...d,bunches};});setToast(`Bunch "${bunch.name}" saved`);};
+  const deleteBunch=(id:string)=>{setData(d=>({...d,bunches:(d.bunches||DEFAULT_BUNCHES).filter(b=>b.id!==id)}));setToast('Bunch removed');};
+  const context={data,setForm,edit,setConfirm,setToast,endOffer,pubs,saveBunch,deleteBunch};
   return <AppShell>
     <Switch>
       <Route path="/"><Dashboard {...context}/></Route>
@@ -2666,6 +3293,7 @@ function AppContent(){
       <Route path="/sale/order"><SaleOrderPage {...context}/></Route>
       <Route path="/sale/challan"><DeliveryChallanPage {...context}/></Route>
       <Route path="/sale/pos"><ComingSoon title="Mobile POS" sub="Quick point-of-sale billing on the go." Icon={Smartphone}/></Route>
+      <Route path="/portal"><CustomerPortal data={data}/></Route>
       <Route path="/purchases"><Purchases {...context}/></Route>
       <Route path="/purchase/bill"><ComingSoon title="Purchase Bill" sub="Create and record bills from your suppliers." Icon={FileInput}/></Route>
       <Route path="/purchase/payment-out"><ComingSoon title="Payment Out" sub="Record outgoing payments to suppliers." Icon={ArrowUpLeft}/></Route>
@@ -2676,14 +3304,14 @@ function AppContent(){
       <Route path="/expense"><ComingSoon title="Expense" sub="Track and categorise your business expenses." Icon={Wallet}/></Route>
       <Route component={NotFound}/>
     </Switch>
-    {form&&form.kind!=='bill'&&<Editor form={form} data={data} pubs={pubs} onAddPub={addPub} onClose={()=>setForm(null)} onSave={save}/>}
+    {form&&form.kind!=='bill'&&<Editor form={form} data={data} pubs={pubs} onAddPub={addPub} onClose={()=>setForm(null)} onSave={save} onSaveBunch={saveBunch}/>}
     {form&&form.kind==='bill'&&<BillingModal data={data} onClose={()=>setForm(null)}/>}
     {confirm&&<div className="modal-backdrop" role="presentation"><div className="modal" role="dialog" aria-modal="true"><div className="modal-head"><div><h2>Remove this {confirm.kind}?</h2><p>This action cannot be undone.</p></div><button className="icon-button" onClick={()=>setConfirm(null)} aria-label="Close"><X/></button></div><div className="modal-body"><p style={{fontSize:13,color:'#536157',lineHeight:1.6}}>You’re about to remove <b>{confirm.name}</b>. It will no longer appear in your workspace.</p></div><div className="modal-foot"><button className="btn" onClick={()=>setConfirm(null)}>Keep it</button><button className="btn danger" onClick={remove}><Trash2/> Remove</button></div></div></div>}
     {toast&&<div className="toast" role="status" data-testid="status-feedback"><Check size={15} style={{verticalAlign:'middle',marginRight:8}}/>{toast}</div>}
   </AppShell>;
 }
 
-type Context={data:Dataset;pubs:string[];setForm:(form:FormState)=>void;edit:(kind:'customer'|'book'|'offer'|'purchase',item?:Customer|Book|Offer|Purchase)=>void;setConfirm:(item:{kind:'customer'|'book'|'offer'|'purchase';id:string;name:string}|null)=>void;setToast:(msg:string)=>void;endOffer:(id:string)=>void};
+type Context={data:Dataset;pubs:string[];setForm:(form:FormState)=>void;edit:(kind:'customer'|'book'|'offer'|'purchase',item?:Customer|Book|Offer|Purchase)=>void;setConfirm:(item:{kind:'customer'|'book'|'offer'|'purchase';id:string;name:string}|null)=>void;setToast:(msg:string)=>void;endOffer:(id:string)=>void;saveBunch?:(bunch:BookBunch)=>void;deleteBunch?:(id:string)=>void;};
 function Heading({eyebrow,title,subtitle,children}:{eyebrow:string;title:string;subtitle:string;children?:ReactNode}){return <div className="page-heading"><div><div className="eyebrow">{eyebrow}</div><h1>{title}</h1><p className="subhead">{subtitle}</p></div>{children&&<div className="heading-actions">{children}</div>}</div>}
 function Stat({label,value,note,Icon,tint='green'}:{label:string;value:string|number;note:string;Icon:any;tint?:string}){return <div className="panel stat-card"><div className="stat-top"><span>{label}</span><span className={`stat-icon ${tint}`}><Icon/></span></div><div className="stat-value">{value}</div><div className="stat-note">{note}</div></div>}
 function Pill({children,state}:{children:ReactNode;state?:string}){const cls=state==='Pending'||state==='Draft'||state==='Scheduled'?'warn':state==='Inactive'||state==='Ended'||state==='Out of stock'?'neutral':state==='Low stock'?'red':'';return <span className={`pill ${cls}`}>{children}</span>}
@@ -2707,14 +3335,164 @@ function Customers(c:Context){
  return <main className="page"><Heading eyebrow="People & permissions" title="Customer accounts" subtitle="Give every family the right access to the books they need."><button className="btn primary" onClick={()=>c.setForm({kind:'customer'})} data-testid="button-add-customer"><Plus/> Add customer</button></Heading>
  <div className="stat-grid"><Stat label="Total Dues" value={money(c.data.customers.reduce((a,b)=>a+(b.amountDue||0),0))} note="Outstanding from families" Icon={Building2} tint="red"/><Stat label="Total Collected" value={money(c.data.customers.reduce((a,b)=>a+(b.amountPaid||0),0))} note="Payments received" Icon={Check} tint="green"/><Stat label="Active Families" value={c.data.customers.filter(x=>x.status==='Active').length.toString()} note="Currently enrolled" Icon={UsersRound} tint="neutral"/></div>
  <div className="toolbar"><SearchBar value={query} onChange={setQuery} placeholder="Search customers, schools, email…"/><select className="filter-select" value={filter} onChange={e=>setFilter(e.target.value)} aria-label="Filter customer status" data-testid="select-customer-status"><option>All statuses</option><option>Active</option><option>Pending</option><option>Inactive</option></select><span className="muted" style={{marginLeft:'auto'}}>{rows.length} accounts</span></div>
- <section className="panel"><div className="table-wrap"><table className="data-table"><thead><tr><th>Customer</th><th>School / class</th><th>Publication access</th><th>Payments</th><th>Joined</th><th>Status</th><th></th></tr></thead><tbody>{rows.map(x=><tr key={x.id} data-testid={`row-customer-${x.id}`}><td><div className="book-title">{x.name}</div><div className="muted">{x.email} · {x.phone}</div></td><td>{x.school}<div className="muted">{x.className}</div></td><td><div style={{display:'flex',gap:4,flexWrap:'wrap'}}>{x.allowedPublications.slice(0,2).map(p=><span key={p} className="pill neutral">{p}</span>)}{x.allowedPublications.length>2&&<span className="pill neutral">+{x.allowedPublications.length-2}</span>}</div></td><td><div style={{display:'flex',flexDirection:'column',gap:4}}><span style={{fontSize:11,color:'#465d49',fontWeight:600}}>Paid: {money(x.amountPaid||0)}</span>{(x.amountDue||0)>0&&<span style={{fontSize:11,color:'#a24840',fontWeight:600}}>Due: {money(x.amountDue||0)}</span>}</div></td><td>{new Date(`${x.joinedAt}T00:00:00`).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})}</td><td><Pill state={x.status}>{x.status}</Pill></td><td><div className="row-actions"><button className="icon-button" aria-label={`Edit ${x.name}`} title="Edit customer" onClick={()=>c.edit('customer',x)} data-testid={`button-edit-customer-${x.id}`}><Pencil/></button><button className="icon-button" aria-label={`Remove ${x.name}`} title="Remove customer" onClick={()=>c.setConfirm({kind:'customer',id:x.id,name:x.name})} data-testid={`button-remove-customer-${x.id}`}><Trash2/></button></div></td></tr>)}</tbody></table>{!rows.length&&<TableEmpty label="No matching accounts" detail={query?'Try another name, email or school.':'Create your first customer account to get started.'} Icon={UsersRound} action={!query&&<button className="btn primary" onClick={()=>c.setForm({kind:'customer'})}><Plus/> Add customer</button>}/>}</div></section></main>
+ <section className="panel"><div className="table-wrap"><table className="data-table"><thead><tr><th>Customer</th><th>School / class</th><th>Book & Publication access</th><th>Login Credentials</th><th>Payments</th><th>Joined</th><th>Status</th><th></th></tr></thead><tbody>{rows.map(x=><tr key={x.id} data-testid={`row-customer-${x.id}`}><td><div className="book-title">{x.name}</div><div className="muted">{x.email} · {x.phone}</div></td><td>{x.school}<div className="muted">{x.className}</div></td><td>{x.allowedBooks && x.allowedBooks.length > 0 ? (<div style={{display:'flex',gap:4,flexWrap:'wrap',alignItems:'center'}}><span className="pill" style={{background:'#dbebe0',color:'#1c3829',fontWeight:700,fontSize:10}}>📚 {x.allowedBooks.length} {x.allowedBooks.length===1?'book':'books'}</span>{x.allowedBooks.slice(0,2).map(id=>{const bk=c.data.books.find(b=>b.id===id);return <span key={id} className="pill neutral" style={{maxWidth:110,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',fontSize:10}} title={bk?.title||id}>{bk?.title||id}</span>;})}{x.allowedBooks.length>2&&<span className="pill neutral" style={{fontSize:10}}>+{x.allowedBooks.length-2}</span>}</div>) : (<div style={{display:'flex',gap:4,flexWrap:'wrap'}}>{x.allowedPublications.slice(0,2).map(p=><span key={p} className="pill neutral">{p}</span>)}{x.allowedPublications.length>2&&<span className="pill neutral">+{x.allowedPublications.length-2}</span>}{!x.allowedPublications.length&&<span className="muted" style={{fontSize:11}}>All books</span>}</div>)}</td><td><div style={{display:'flex',flexDirection:'column',gap:3}}><div style={{display:'flex',alignItems:'center',gap:5}}><span style={{fontSize:10,fontWeight:700,color:'#536157'}}>ID:</span><code style={{fontSize:10,background:'#f0efe6',padding:'1px 5px',borderRadius:4,color:'#315a41',fontFamily:'monospace'}}>{x.loginId || x.email.split('@')[0]}</code></div><div style={{display:'flex',alignItems:'center',gap:5}}><span style={{fontSize:10,fontWeight:700,color:'#536157'}}>Pass:</span><code style={{fontSize:10,background:'#f0efe6',padding:'1px 5px',borderRadius:4,color:'#315a41',fontFamily:'monospace'}}>{x.password || 'Book@123'}</code></div><button type="button" onClick={()=>{const text=`Book Bazaar Student Login:\nPortal: ${window.location.origin}/portal\nEmail: ${x.email}\nLogin ID: ${x.loginId || x.email.split('@')[0]}\nPassword: ${x.password || 'Book@123'}`;navigator.clipboard.writeText(text);c.setToast(`Copied login details for ${x.name}`);}} style={{border:'none',background:'none',color:'#3a6647',fontSize:10,fontWeight:600,cursor:'pointer',display:'flex',alignItems:'center',gap:4,padding:0,marginTop:2}}><Copy size={11}/> Copy Info</button></div></td><td><div style={{display:'flex',flexDirection:'column',gap:4}}><span style={{fontSize:11,color:'#465d49',fontWeight:600}}>Paid: {money(x.amountPaid||0)}</span>{(x.amountDue||0)>0&&<span style={{fontSize:11,color:'#a24840',fontWeight:600}}>Due: {money(x.amountDue||0)}</span>}</div></td><td>{new Date(`${x.joinedAt}T00:00:00`).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})}</td><td><Pill state={x.status}>{x.status}</Pill></td><td><div className="row-actions"><button className="icon-button" aria-label={`Login as ${x.name}`} title="Open Student Portal as this customer" onClick={()=>{sessionStorage.setItem('bookbazaar-current-student-id',x.id);window.location.href='#/portal';}}><GraduationCap size={14}/></button><button className="icon-button" aria-label={`Edit ${x.name}`} title="Edit customer" onClick={()=>c.edit('customer',x)} data-testid={`button-edit-customer-${x.id}`}><Pencil/></button><button className="icon-button" aria-label={`Remove ${x.name}`} title="Remove customer" onClick={()=>c.setConfirm({kind:'customer',id:x.id,name:x.name})} data-testid={`button-remove-customer-${x.id}`}><Trash2/></button></div></td></tr>)}</tbody></table>{!rows.length&&<TableEmpty label="No matching accounts" detail={query?'Try another name, email or school.':'Create your first customer account to get started.'} Icon={UsersRound} action={!query&&<button className="btn primary" onClick={()=>c.setForm({kind:'customer'})}><Plus/> Add customer</button>}/>}</div></section></main>
+}
+
+
+/* ─── Book Bunches Management Modal ─────────────────────────────────── */
+function BunchesModal({ data, onClose, onSaveBunch, onDeleteBunch }: { data: Dataset; onClose: () => void; onSaveBunch?: (b: BookBunch) => void; onDeleteBunch?: (id: string) => void }) {
+  const bunches = data.bunches || DEFAULT_BUNCHES;
+  const [showCreate, setShowCreate] = useState(false);
+  const [name, setName] = useState('');
+  const [className, setClassName] = useState('');
+  const [selectedBooks, setSelectedBooks] = useState<string[]>([]);
+
+  const handleCreate = () => {
+    if (!name.trim() || !selectedBooks.length) return;
+    const newB: BookBunch = {
+      id: `BN-${Math.random().toString(36).slice(2, 7).toUpperCase()}`,
+      name: name.trim(),
+      className: className || 'All Classes',
+      bookIds: selectedBooks,
+      description: `${selectedBooks.length} books for ${className || 'curriculum'}`
+    };
+    if (onSaveBunch) onSaveBunch(newB);
+    setShowCreate(false);
+    setName('');
+    setClassName('');
+    setSelectedBooks([]);
+  };
+
+  const handleAutoGenerate = () => {
+    const classList = Array.from(new Set(data.books.map(b => b.className))).filter(Boolean);
+    classList.forEach(cls => {
+      const existing = bunches.some(bn => bn.className === cls);
+      if (!existing) {
+        const bks = data.books.filter(b => b.className === cls);
+        if (bks.length) {
+          const autoBunch: BookBunch = {
+            id: `BN-${Math.random().toString(36).slice(2, 7).toUpperCase()}`,
+            name: `${cls} - Complete Set`,
+            className: cls,
+            bookIds: bks.map(b => b.id),
+            description: `All ${bks.length} catalog books for ${cls}`
+          };
+          if (onSaveBunch) onSaveBunch(autoBunch);
+        }
+      }
+    });
+  };
+
+  return (
+    <div className="modal-backdrop" onMouseDown={e => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="modal" style={{ width: 'min(640px, 100%)' }} role="dialog" aria-modal="true">
+        <div className="modal-head">
+          <div>
+            <h2>Book Bunches & Bundles</h2>
+            <p>Pre-packaged sets of books for fast assignment to students and invoice billing.</p>
+          </div>
+          <button type="button" className="icon-button" onClick={onClose} aria-label="Close"><X /></button>
+        </div>
+        <div className="modal-body">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+            <span style={{ fontSize: 12, fontWeight: 700, color: '#244331' }}>{bunches.length} Bunches Configured</span>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button type="button" className="btn" style={{ fontSize: 11, padding: '5px 10px' }} onClick={handleAutoGenerate}>
+                ⚡ Auto-generate Class Sets
+              </button>
+              <button type="button" className="btn primary" style={{ fontSize: 11, padding: '5px 12px' }} onClick={() => setShowCreate(!showCreate)}>
+                <Plus size={12} /> {showCreate ? 'Cancel' : 'Create New Bunch'}
+              </button>
+            </div>
+          </div>
+
+          {showCreate && (
+            <div style={{ background: '#f5f8f5', border: '1px solid #7ea383', borderRadius: 9, padding: 14, marginBottom: 16 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: '#244331', marginBottom: 10 }}>Define New Book Bunch</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+                <div className="field">
+                  <label>BUNCH NAME *</label>
+                  <input value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Class 10 - Commerce Set" />
+                </div>
+                <div className="field">
+                  <label>CLASS</label>
+                  <select value={className} onChange={e => setClassName(e.target.value)}>
+                    <option value="">Select Class</option>
+                    {'Pre Nur,Nursery,LKG,UKG'.split(',').concat(Array.from({length:12},(_,i)=>`Class ${i+1}`)).map(x=><option key={x}>{x}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div className="field" style={{ marginBottom: 12 }}>
+                <label>SELECT BOOKS ({selectedBooks.length} selected):</label>
+                <div style={{ maxHeight: 150, overflowY: 'auto', background: '#fff', border: '1px solid #d5cfc3', borderRadius: 7, padding: 8, display: 'flex', flexDirection: 'column', gap: 5 }}>
+                  {(className ? data.books.filter(b => b.className === className) : data.books).map(b => (
+                    <label key={b.id} style={{ fontSize: 11, display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', padding: '3px 6px', borderRadius: 4, background: selectedBooks.includes(b.id) ? '#edf5ee' : 'transparent' }}>
+                      <input
+                        type="checkbox"
+                        checked={selectedBooks.includes(b.id)}
+                        onChange={e => setSelectedBooks(e.target.checked ? [...selectedBooks, b.id] : selectedBooks.filter(x => x !== b.id))}
+                        style={{ accentColor: '#315a41' }}
+                      />
+                      <span style={{ fontWeight: 600, color: '#1e3d2c' }}>{b.title}</span>
+                      <span style={{ fontSize: 10, color: '#8a9389' }}>({b.className} · {b.publication} · ₹{b.price})</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+                <button type="button" className="btn" onClick={() => setShowCreate(false)}>Cancel</button>
+                <button type="button" className="btn primary" disabled={!name.trim() || !selectedBooks.length} onClick={handleCreate}><Save size={13} /> Save Bunch</button>
+              </div>
+            </div>
+          )}
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {bunches.map(bn => {
+              const bks = bn.bookIds.map(id => data.books.find(b => b.id === id)).filter(Boolean) as Book[];
+              const totalPrice = bks.reduce((sum, b) => sum + (b.price || 0), 0);
+              return (
+                <div key={bn.id} style={{ border: '1px solid #e5ded2', borderRadius: 10, padding: 12, background: '#fff' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <b style={{ fontSize: 13, color: '#244331' }}>{bn.name}</b>
+                        <span style={{ fontSize: 10, background: '#eaf2ec', color: '#2b5139', padding: '2px 7px', borderRadius: 10, fontWeight: 600 }}>{bn.className}</span>
+                      </div>
+                      <div style={{ fontSize: 11, color: '#8a9389', marginTop: 2 }}>{bn.description || `${bks.length} titles`}</div>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <span style={{ fontSize: 13, fontWeight: 700, color: '#244331' }}>{money(totalPrice)}</span>
+                      {onDeleteBunch && (
+                        <button type="button" className="icon-button" title="Delete bunch" onClick={() => onDeleteBunch(bn.id)}><Trash2 size={13} /></button>
+                      )}
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
+                    {bks.map(b => (
+                      <span key={b.id} style={{ fontSize: 10, background: '#f5f3eb', border: '1px solid #e6e0d3', borderRadius: 5, padding: '2px 7px', color: '#445247' }}>
+                        {b.title} <span style={{ color: '#8a9389' }}>({money(b.price)})</span>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+        <div className="modal-foot">
+          <button type="button" className="btn primary" onClick={onClose}>Done</button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function Books(c:Context){
+ const [showBunches, setShowBunches] = useState(false);
  const [query,setQuery]=useState('');const [pub,setPub]=useState('All publications');const [cls,setCls]=useState('All classes');
  const classes=Array.from(new Set(c.data.books.map(b=>b.className))).sort((a,b)=>Number(a.replace('Class ',''))-Number(b.replace('Class ','')));
  const rows=useMemo(()=>c.data.books.filter(b=>`${b.title} ${b.author} ${b.isbn} ${b.sku}`.toLowerCase().includes(query.toLowerCase())&&(pub==='All publications'||b.publication===pub)&&(cls==='All classes'||b.className===cls)),[c.data.books,query,pub,cls]);
- return <main className="page"><Heading eyebrow="Catalog" title="Books & titles" subtitle="Keep your school catalog accurate, discoverable, and ready to sell."><button className="btn primary" onClick={()=>c.setForm({kind:'book'})} data-testid="button-add-book"><Plus/> Add a book</button></Heading>
+ return <main className="page"><Heading eyebrow="Catalog" title="Books & titles" subtitle="Keep your school catalog accurate, discoverable, and ready to sell."><button className="btn" onClick={()=>setShowBunches(true)} style={{display:'flex',alignItems:'center',gap:6}}><Boxes size={14}/> Book Bunches ({(c.data.bunches || DEFAULT_BUNCHES).length})</button><button className="btn primary" onClick={()=>c.setForm({kind:'book'})} data-testid="button-add-book"><Plus/> Add a book</button></Heading>{showBunches && <BunchesModal data={c.data} onClose={()=>setShowBunches(false)} onSaveBunch={c.saveBunch} onDeleteBunch={c.deleteBunch} />}
  <div className="toolbar"><SearchBar value={query} onChange={setQuery} placeholder="Search titles, authors, ISBN or SKU…"/><select className="filter-select" value={pub} onChange={e=>setPub(e.target.value)} aria-label="Filter publication"><option>All publications</option>{c.pubs.map(p=><option key={p}>{p}</option>)}</select><select className="filter-select" value={cls} onChange={e=>setCls(e.target.value)} aria-label="Filter class"><option>All classes</option>{classes.map(x=><option key={x}>{x}</option>)}</select><span className="muted" style={{marginLeft:'auto'}}>{rows.length} titles</span></div>
  <section className="panel"><div className="table-wrap"><table className="data-table"><thead><tr><th>Book title</th><th>Publication</th><th>Class / subject</th><th>SKU / ISBN</th><th>Price</th><th>Stock</th><th>Status</th><th></th></tr></thead><tbody>{rows.map(b=><tr key={b.id} data-testid={`row-book-${b.id}`} className={b.stock<=b.lowStockThreshold?'low-row':''}><td><div className="book-title">{b.title}</div><div className="muted">{b.author}</div></td><td>{b.publication}</td><td>{b.className}<div className="muted">{b.subject}</div></td><td><span style={{fontSize:10}}>{b.sku}</span><div className="muted">{b.isbn}</div></td><td>{money(b.price)}</td><td><b style={{color:b.stock===0?'#a24840':b.stock<=b.lowStockThreshold?'#a9663b':'#465d49'}}>{b.stock}</b><div className="muted">min. {b.lowStockThreshold}</div></td><td><Pill state={b.status}>{b.status}</Pill></td><td><div className="row-actions"><button className="icon-button" title="Edit book" aria-label={`Edit ${b.title}`} onClick={()=>c.edit('book',b)}><Pencil/></button><button className="icon-button" title="Remove book" aria-label={`Remove ${b.title}`} onClick={()=>c.setConfirm({kind:'book',id:b.id,name:b.title})}><Trash2/></button></div></td></tr>)}</tbody></table>{!rows.length&&<TableEmpty label="No titles found" detail="Try changing your search or publication filters." Icon={BookOpen} action={<button className="btn primary" onClick={()=>c.setForm({kind:'book'})}><Plus/> Add a book</button>}/>}</div></section></main>
 }
@@ -2752,10 +3530,10 @@ function Inventory(c:Context){
  <section className="panel"><div className="table-wrap"><table className="data-table"><thead><tr><th>Title</th><th>Publication</th><th>SKU</th><th>On hand</th><th>Reorder point</th><th>Stock health</th><th>Stock value</th><th></th></tr></thead><tbody>{rows.map(b=><tr key={b.id} className={b.stock<=b.lowStockThreshold?'low-row':''}><td><div className="book-title">{b.title}</div><div className="muted">{b.author}</div></td><td>{b.publication}</td><td>{b.sku}</td><td><b style={{fontSize:14,color:b.stock===0?'#a24840':b.stock<=b.lowStockThreshold?'#a9663b':'#31513d'}}>{b.stock}</b></td><td>{b.lowStockThreshold} units</td><td><Pill state={b.stock===0?'Out of stock':b.stock<=b.lowStockThreshold?'Low stock':'Healthy'}>{b.stock===0?'Out of stock':b.stock<=b.lowStockThreshold?'Low stock':'Healthy'}</Pill></td><td>{money(b.stock*b.price)}</td><td><button className="btn" style={{padding:'7px 10px'}} onClick={()=>c.setForm({kind:'stock',book:b})}><Plus size={13}/> Adjust</button></td></tr>)}</tbody></table>{!rows.length&&<TableEmpty label="Nothing in this view" detail="Try another filter or search term." Icon={Boxes}/>}</div></section></main>
 }
 
-function Editor({form,data,pubs,onAddPub,onClose,onSave}:{form:Exclude<FormState,null>;data:Dataset;pubs:string[];onAddPub:(name:string)=>void;onClose:()=>void;onSave:(kind:any,values:any,original?:any)=>void}){
+function Editor({form,data,pubs,onAddPub,onClose,onSave,onSaveBunch}:{form:Exclude<FormState,null>;data:Dataset;pubs:string[];onAddPub:(name:string)=>void;onClose:()=>void;onSave:(kind:any,values:any,original?:any)=>void;onSaveBunch?:(bunch:BookBunch)=>void}){
  const kind=form.kind; const editing=!!form.item; const original=form.item as any;
  const [values,setValues]=useState<Record<string,any>>(()=>{
-   if(kind==='customer')return original?{...original,allowedPublications:[...original.allowedPublications],allowedBooks:original.allowedBooks?[...original.allowedBooks]:[]}:{name:'',email:'',phone:'',school:'',className:'Class 5',status:'Active',allowedPublications:[],allowedBooks:[]};
+   if(kind==='customer')return original?{...original,allowedPublications:[...original.allowedPublications],allowedBooks:original.allowedBooks?[...original.allowedBooks]:[],password:original.password||(`${(original.name||'Student').split(' ')[0]}@123`),loginId:original.loginId||(original.email?original.email.split('@')[0]:'')}:{name:'',email:'',phone:'',school:'',className:'Class 5',status:'Active',allowedPublications:[],allowedBooks:[],password:'Book@123',loginId:''};
    if(kind==='book')return original?{...original}:{title:'',publication:pubs[0]||'RD Sharma',subject:'Mathematics',className:'Class 5',isbn:'',sku:'',price:'',stock:0,lowStockThreshold:10,status:'Active'};
    if(kind==='offer')return original?{...original,bookIds:[...original.bookIds]}:{title:'',bookIds:[],discountPercent:10,startDate:today,endDate:'2025-03-15',status:'Active'};
     if(kind==='purchase')return original?{...original}:{manufacturer:'',bookId:'',qtyPurchased:100,amountPaid:0,amountDue:0,status:'Pending',date:today};
@@ -2766,12 +3544,447 @@ function Editor({form,data,pubs,onAddPub,onClose,onSave}:{form:Exclude<FormState
  const [selBook, setSelBook] = useState('');
  const [newPubInput, setNewPubInput] = useState('');
  const [showPubInput, setShowPubInput] = useState(false);
+ const [assignMode, setAssignMode] = useState<'single' | 'bunch'>('single');
+ const [selBunchKey, setSelBunchKey] = useState('');
+ const [showCreateBunch, setShowCreateBunch] = useState(false);
+ const [newBunchName, setNewBunchName] = useState('');
+ const [newBunchClass, setNewBunchClass] = useState('');
+ const [newBunchBookIds, setNewBunchBookIds] = useState<string[]>([]);
+ const [bunchFeedback, setBunchFeedback] = useState('');
+ const [showPassword, setShowPassword] = useState(false);
+
+ const allBunches: BookBunch[] = data.bunches && data.bunches.length ? data.bunches : DEFAULT_BUNCHES;
+ const classesWithBooks = Array.from(new Set(data.books.map(b => b.className)))
+   .filter(Boolean)
+   .sort((a, b) => {
+     const numA = parseInt(a.replace(/\D/g, '') || '0', 10);
+     const numB = parseInt(b.replace(/\D/g, '') || '0', 10);
+     return numA - numB;
+   });
+
+ const selectedBunchBooks: Book[] = useMemo(() => {
+   if (!selBunchKey) return [];
+   if (selBunchKey.startsWith('CLASS_')) {
+     const clsName = selBunchKey.replace('CLASS_', '');
+     return data.books.filter(b => b.className === clsName);
+   }
+   const found = allBunches.find(b => b.id === selBunchKey);
+   return found ? (found.bookIds.map(id => data.books.find(b => b.id === id)).filter(Boolean) as Book[]) : [];
+ }, [selBunchKey, allBunches, data.books]);
+
  const set=(key:string,value:any)=>setValues(v=>({...v,[key]:value}));
  const submit=(e:FormEvent)=>{e.preventDefault();const payload={...values};if(kind==='book'){payload.price=Number(payload.price);payload.stock=Number(payload.stock);payload.lowStockThreshold=Number(payload.lowStockThreshold);}if(kind==='offer')payload.discountPercent=Number(payload.discountPercent);if(kind==='purchase'){payload.qtyPurchased=Number(payload.qtyPurchased);payload.amountPaid=Number(payload.amountPaid);payload.amountDue=Number(payload.amountDue);}onSave(kind,payload,original);};
  const title=kind==='customer'?(editing?'Edit customer account':'Create customer account'):kind==='book'?(editing?'Edit book details':'Add a book to catalog'):kind==='offer'?(editing?'Edit offer':'Create an offer'):kind==='purchase'?(editing?'Edit purchase':'Record purchase'):'Adjust stock';
  const desc=kind==='customer'?'Account details and publication permissions':kind==='book'?'Catalog information, pricing, and stock threshold':kind==='offer'?'Choose the books and dates for this offer':kind==='purchase'?'Log a wholesaler purchase and payment status':'Record a stock movement';
  return <div className="modal-backdrop" onMouseDown={e=>{if(e.target===e.currentTarget)onClose()}}><form className="modal" onSubmit={submit} role="dialog" aria-modal="true"><div className="modal-head"><div><h2>{title}</h2><p>{desc}</p></div><button type="button" className="icon-button" onClick={onClose} aria-label="Close"><X/></button></div><div className="modal-body">
-  {kind==='customer'&&<div className="form-grid"><div className="field"><label>Full name *</label><input required value={values.name} onChange={e=>set('name',e.target.value)} placeholder="e.g. Aanya Sharma"/></div><div className="field"><label>Email address *</label><input required type="email" value={values.email} onChange={e=>set('email',e.target.value)} placeholder="family@email.com"/></div><div className="field"><label>Phone number *</label><input required value={values.phone} onChange={e=>set('phone',e.target.value)} placeholder="+91 98xxx xxxxx"/></div><div className="field"><label>School *</label><input required value={values.school} onChange={e=>set('school',e.target.value)} placeholder="School name"/></div><div className="field"><label>Amount Paid (₹)</label><input type="number" min="0" value={values.amountPaid ?? ''} onChange={e=>set('amountPaid',e.target.value)}/></div><div className="field"><label>Amount Due (₹)</label><input type="number" min="0" value={values.amountDue ?? ''} onChange={e=>set('amountDue',e.target.value)}/></div><div className="field"><label>Account status</label><select value={values.status} onChange={e=>set('status',e.target.value)}><option>Active</option><option>Pending</option><option>Inactive</option></select></div><div className="field full"><label>Assign specific books</label><div style={{display:'flex',gap:8,marginBottom:8}}><select style={{flex:1}} value={selClass} onChange={e=>{setSelClass(e.target.value);setSelPub('');setSelBook('');}}><option value="">Select Class</option>{'Pre Nur,Nursery,LKG,UKG'.split(',').concat(Array.from({length:12},(_,i)=>`Class ${i+1}`)).map(x=><option key={x}>{x}</option>)}</select><select style={{flex:1}} value={selPub} onChange={e=>{setSelPub(e.target.value);setSelBook('');}} disabled={!selClass}><option value="">Select Publication</option>{Array.from(new Set(data.books.filter(b=>b.className===selClass).map(b=>b.publication))).map(p=><option key={p}>{p}</option>)}</select><select style={{flex:1}} value={selBook} onChange={e=>setSelBook(e.target.value)} disabled={!selPub}><option value="">Select Book</option>{data.books.filter(b=>b.className===selClass&&b.publication===selPub).map(b=><option key={b.id} value={b.id}>{b.title}</option>)}</select><button type="button" className="btn" disabled={!selBook} onClick={()=>{if(!values.allowedBooks?.includes(selBook))set('allowedBooks',[...(values.allowedBooks||[]),selBook]);setSelBook('');}}>Add</button></div><div className="checks">{(values.allowedBooks||[]).map((id:string)=>{const b=data.books.find(x=>x.id===id);return <label className="check-pill" key={id}><input type="checkbox" checked onChange={()=>set('allowedBooks',values.allowedBooks.filter((x:string)=>x!==id))}/>{b?.title||id}</label>})}</div><span className="muted">Families can only purchase these selected titles.</span></div></div>}
+  {kind==='customer'&&<div className="form-grid">
+  <div className="field"><label>Full name *</label><input required value={values.name} onChange={e=>set('name',e.target.value)} placeholder="e.g. Aanya Sharma"/></div>
+  <div className="field"><label>Email address *</label><input required type="email" value={values.email} onChange={e=>set('email',e.target.value)} placeholder="family@email.com"/></div>
+  <div className="field"><label>Phone number *</label><input required value={values.phone} onChange={e=>set('phone',e.target.value)} placeholder="+91 98xxx xxxxx"/></div>
+  <div className="field"><label>School *</label><input required value={values.school} onChange={e=>set('school',e.target.value)} placeholder="School name"/></div>
+  <div className="field"><label>Class</label><select value={values.className || 'Class 5'} onChange={e=>set('className',e.target.value)}>{'Pre Nur,Nursery,LKG,UKG'.split(',').concat(Array.from({length:12},(_,i)=>`Class ${i+1}`)).map(x=><option key={x}>{x}</option>)}</select></div>
+  <div className="field"><label>Account status</label><select value={values.status} onChange={e=>set('status',e.target.value)}><option>Active</option><option>Pending</option><option>Inactive</option></select></div>
+  <div className="field"><label>Amount Paid (₹)</label><input type="number" min="0" value={values.amountPaid ?? ''} onChange={e=>set('amountPaid',e.target.value)}/></div>
+  <div className="field"><label>Amount Due (₹)</label><input type="number" min="0" value={values.amountDue ?? ''} onChange={e=>set('amountDue',e.target.value)}/></div>
+
+  {/* Student Portal Login Credentials (ID & Password) */}
+  <div className="field full" style={{background:'#f6f9f6',border:'1px solid #c9ddcd',borderRadius:9,padding:'12px 14px',margin:'2px 0 4px'}}>
+    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
+      <div style={{display:'flex',alignItems:'center',gap:6}}>
+        <KeyRound size={14} style={{color:'#264333'}}/>
+        <span style={{fontSize:11,fontWeight:700,color:'#264333',letterSpacing:'0.4px',textTransform:'uppercase'}}>
+          Student Portal Login Credentials (ID & Password)
+        </span>
+      </div>
+      <span style={{fontSize:10,color:'#526b57'}}>For family to log in & buy assigned books</span>
+    </div>
+    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
+      <div className="field">
+        <label style={{fontSize:10,fontWeight:700,color:'#59685c'}}>
+          LOGIN ID / USERNAME *
+        </label>
+        <input
+          required
+          value={values.loginId ?? ''}
+          onChange={e => set('loginId', e.target.value)}
+          placeholder={values.email ? values.email.split('@')[0] : 'e.g. aanya.sharma'}
+        />
+        <span className="muted" style={{fontSize:9}}>
+          Student can log in using either this ID or their Email ({values.email || 'email'})
+        </span>
+      </div>
+      <div className="field">
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+          <label style={{fontSize:10,fontWeight:700,color:'#59685c',margin:0}}>
+            PASSWORD *
+          </label>
+          <button
+            type="button"
+            onClick={() => {
+              const chars = 'abcdefghjkmnpqrstuvwxyz23456789';
+              let auto = 'Pass@';
+              for (let i = 0; i < 4; i++) auto += chars[Math.floor(Math.random() * chars.length)];
+              set('password', auto);
+              setShowPassword(true);
+            }}
+            style={{background:'none',border:'none',color:'#3a6647',fontSize:10,fontWeight:600,cursor:'pointer',textDecoration:'underline',padding:0}}
+          >
+            Auto-generate
+          </button>
+        </div>
+        <div style={{position:'relative',display:'flex',alignItems:'center'}}>
+          <input
+            type={showPassword ? 'text' : 'password'}
+            required
+            value={values.password ?? ''}
+            onChange={e => set('password', e.target.value)}
+            placeholder="Set customer password"
+            style={{paddingRight:36}}
+          />
+          <button
+            type="button"
+            onClick={() => setShowPassword((v: boolean) => !v)}
+            style={{position:'absolute',right:8,background:'none',border:'none',color:'#778279',cursor:'pointer',padding:2}}
+            title={showPassword ? 'Hide password' : 'Show password'}
+          >
+            {showPassword ? <EyeOff size={14}/> : <Eye size={14}/>}
+          </button>
+        </div>
+        <span className="muted" style={{fontSize:9}}>
+          Share this password with the family to log in and buy books
+        </span>
+      </div>
+    </div>
+  </div>
+
+  {/* Assign Books Container with Single & Bunch Option */}
+  <div className="field full" style={{background:'#faf8f3',border:'1px solid #e7e1d4',borderRadius:10,padding:14,marginTop:4}}>
+    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12,flexWrap:'wrap',gap:8}}>
+      <div style={{display:'flex',alignItems:'center',gap:7}}>
+        <BookOpen size={16} style={{color:'#264333'}}/>
+        <label style={{margin:0,fontSize:13,fontWeight:700,color:'#264333'}}>Assign specific books</label>
+        {(values.allowedBooks||[]).length > 0 && (
+          <span style={{fontSize:11,background:'#264333',color:'#fff',padding:'2px 8px',borderRadius:12,fontWeight:600}}>
+            {(values.allowedBooks||[]).length} selected
+          </span>
+        )}
+      </div>
+      
+      {/* Tab Switcher: Single Book vs Bunch Option */}
+      <div style={{display:'flex',background:'#eae5d8',borderRadius:7,padding:2,gap:2}}>
+        <button
+          type="button"
+          onClick={()=>setAssignMode('single')}
+          style={{
+            border:'none',
+            background: assignMode==='single' ? '#fff' : 'transparent',
+            color: assignMode==='single' ? '#264333' : '#6f786f',
+            boxShadow: assignMode==='single' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+            borderRadius:5,
+            padding:'5px 12px',
+            fontSize:11,
+            fontWeight:600,
+            cursor:'pointer',
+            display:'flex',
+            alignItems:'center',
+            gap:5,
+            transition:'all 0.15s'
+          }}
+        >
+          <BookOpen size={12}/> Single Book
+        </button>
+        <button
+          type="button"
+          onClick={()=>setAssignMode('bunch')}
+          style={{
+            border:'none',
+            background: assignMode==='bunch' ? '#264333' : 'transparent',
+            color: assignMode==='bunch' ? '#fff' : '#6f786f',
+            boxShadow: assignMode==='bunch' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+            borderRadius:5,
+            padding:'5px 12px',
+            fontSize:11,
+            fontWeight:600,
+            cursor:'pointer',
+            display:'flex',
+            alignItems:'center',
+            gap:5,
+            transition:'all 0.15s'
+          }}
+        >
+          <Boxes size={12}/> Bunch Option
+        </button>
+      </div>
+    </div>
+
+    {/* Single Book Mode */}
+    {assignMode === 'single' && (
+      <div style={{background:'#fff',padding:10,borderRadius:8,border:'1px solid #eae5d8',marginBottom:10}}>
+        <div style={{fontSize:11,fontWeight:600,color:'#6f786f',marginBottom:7}}>Add individual title:</div>
+        <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+          <select style={{flex:1,minWidth:120}} value={selClass} onChange={e=>{setSelClass(e.target.value);setSelPub('');setSelBook('');}}>
+            <option value="">Select Class</option>
+            {'Pre Nur,Nursery,LKG,UKG'.split(',').concat(Array.from({length:12},(_,i)=>`Class ${i+1}`)).map(x=><option key={x}>{x}</option>)}
+          </select>
+          <select style={{flex:1,minWidth:140}} value={selPub} onChange={e=>{setSelPub(e.target.value);setSelBook('');}} disabled={!selClass}>
+            <option value="">Select Publication</option>
+            {Array.from(new Set(data.books.filter(b=>b.className===selClass).map(b=>b.publication))).map(p=><option key={p}>{p}</option>)}
+          </select>
+          <select style={{flex:1.5,minWidth:160}} value={selBook} onChange={e=>setSelBook(e.target.value)} disabled={!selPub}>
+            <option value="">Select Book</option>
+            {data.books.filter(b=>b.className===selClass&&b.publication===selPub).map(b=><option key={b.id} value={b.id}>{b.title} (₹{b.price})</option>)}
+          </select>
+          <button
+            type="button"
+            className="btn primary"
+            style={{padding:'7px 14px',display:'flex',alignItems:'center',gap:5}}
+            disabled={!selBook}
+            onClick={()=>{
+              if(!values.allowedBooks?.includes(selBook)){
+                set('allowedBooks',[...(values.allowedBooks||[]),selBook]);
+                setBunchFeedback('✓ Book added!');
+                setTimeout(()=>setBunchFeedback(''),2200);
+              }
+              setSelBook('');
+            }}
+          >
+            <Plus size={13}/> Add Book
+          </button>
+        </div>
+      </div>
+    )}
+
+    {/* Bunch Option Mode */}
+    {assignMode === 'bunch' && (
+      <div style={{background:'#fff',padding:12,borderRadius:8,border:'1px solid #eae5d8',marginBottom:10}}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8,flexWrap:'wrap',gap:6}}>
+          <div style={{fontSize:11,fontWeight:600,color:'#264333',display:'flex',alignItems:'center',gap:5}}>
+            <Boxes size={13} style={{color:'#3a6647'}}/> Select & Add Book Bunch:
+          </div>
+          <button
+            type="button"
+            onClick={()=>setShowCreateBunch(v=>!v)}
+            style={{background:'none',border:'none',color:'#3a6647',fontSize:11,fontWeight:600,cursor:'pointer',display:'flex',alignItems:'center',gap:4,padding:0}}
+          >
+            <PlusCircle size={13}/> {showCreateBunch ? 'Hide Bunch Creator' : '+ Create New Bunch'}
+          </button>
+        </div>
+
+        {/* Inline Create Bunch Form */}
+        {showCreateBunch && (
+          <div style={{background:'#f6f9f6',border:'1px dashed #7ea383',borderRadius:8,padding:12,marginBottom:12}}>
+            <div style={{fontSize:12,fontWeight:700,color:'#244331',marginBottom:8}}>Create a New Book Bunch</div>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:8}}>
+              <div>
+                <label style={{fontSize:10,fontWeight:600,color:'#536157',display:'block',marginBottom:3}}>BUNCH NAME *</label>
+                <input
+                  style={{width:'100%',padding:'6px 8px',fontSize:12,border:'1px solid #d5cfc3',borderRadius:6}}
+                  placeholder="e.g. Class 8 - Heritage School Kit"
+                  value={newBunchName}
+                  onChange={e=>setNewBunchName(e.target.value)}
+                />
+              </div>
+              <div>
+                <label style={{fontSize:10,fontWeight:600,color:'#536157',display:'block',marginBottom:3}}>TARGET CLASS</label>
+                <select
+                  style={{width:'100%',padding:'6px 8px',fontSize:12,border:'1px solid #d5cfc3',borderRadius:6}}
+                  value={newBunchClass}
+                  onChange={e=>setNewBunchClass(e.target.value)}
+                >
+                  <option value="">Select Class</option>
+                  {'Pre Nur,Nursery,LKG,UKG'.split(',').concat(Array.from({length:12},(_,i)=>`Class ${i+1}`)).map(x=><option key={x}>{x}</option>)}
+                </select>
+              </div>
+            </div>
+            <div>
+              <label style={{fontSize:10,fontWeight:600,color:'#536157',display:'block',marginBottom:4}}>SELECT BOOKS FOR THIS BUNCH ({newBunchBookIds.length} selected):</label>
+              <div style={{maxHeight:120,overflowY:'auto',background:'#fff',border:'1px solid #e0dbce',borderRadius:6,padding:6,display:'flex',flexDirection:'column',gap:4}}>
+                {(newBunchClass ? data.books.filter(b=>b.className===newBunchClass) : data.books).map(b=>(
+                  <label key={b.id} style={{fontSize:11,display:'flex',alignItems:'center',gap:6,cursor:'pointer',padding:'2px 4px',borderRadius:4,background:newBunchBookIds.includes(b.id)?'#f0f6f1':'transparent'}}>
+                    <input
+                      type="checkbox"
+                      checked={newBunchBookIds.includes(b.id)}
+                      onChange={e=>setNewBunchBookIds(e.target.checked?[...newBunchBookIds,b.id]:newBunchBookIds.filter(x=>x!==b.id))}
+                      style={{accentColor:'#315a41'}}
+                    />
+                    <span style={{fontWeight:500,color:'#264333'}}>{b.title}</span>
+                    <span style={{fontSize:10,color:'#8a9389'}}>({b.className} · {b.publication} · ₹{b.price})</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+            <div style={{display:'flex',justifyContent:'flex-end',gap:6,marginTop:8}}>
+              <button
+                type="button"
+                className="btn"
+                style={{padding:'5px 10px',fontSize:11}}
+                onClick={()=>{setShowCreateBunch(false);setNewBunchName('');setNewBunchClass('');setNewBunchBookIds([]);}}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn primary"
+                style={{padding:'5px 12px',fontSize:11}}
+                disabled={!newBunchName.trim() || newBunchBookIds.length===0}
+                onClick={()=>{
+                  const newBunch: BookBunch = {
+                    id: `BN-${Math.random().toString(36).slice(2,6).toUpperCase()}`,
+                    name: newBunchName.trim(),
+                    className: newBunchClass || 'All Classes',
+                    bookIds: newBunchBookIds,
+                    description: `${newBunchBookIds.length} books for ${newBunchClass || 'curriculum'}`
+                  };
+                  if(onSaveBunch) onSaveBunch(newBunch);
+                  setSelBunchKey(newBunch.id);
+                  setShowCreateBunch(false);
+                  setNewBunchName('');
+                  setNewBunchClass('');
+                  setNewBunchBookIds([]);
+                  setBunchFeedback(`✓ Created bunch "${newBunch.name}"!`);
+                  setTimeout(()=>setBunchFeedback(''),2500);
+                }}
+              >
+                Save Bunch
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Select Bunch dropdown & Add button */}
+        <div style={{display:'flex',gap:8,alignItems:'flex-start',flexWrap:'wrap'}}>
+          <div style={{flex:1,minWidth:220}}>
+            <select
+              style={{width:'100%',padding:'7px 10px'}}
+              value={selBunchKey}
+              onChange={e=>setSelBunchKey(e.target.value)}
+            >
+              <option value="">-- Choose a Book Bunch --</option>
+              {allBunches.length > 0 && (
+                <optgroup label="📦 Pre-configured Bunches">
+                  {allBunches.map(bn => (
+                    <option key={bn.id} value={bn.id}>
+                      {bn.name} ({bn.bookIds.length} books · {bn.className})
+                    </option>
+                  ))}
+                </optgroup>
+              )}
+              <optgroup label="⚡ Quick Class Sets (All titles in Class)">
+                {classesWithBooks.map(cls => (
+                  <option key={`CLASS_${cls}`} value={`CLASS_${cls}`}>
+                    ⚡ All {cls} Books ({data.books.filter(b=>b.className===cls).length} books)
+                  </option>
+                ))}
+              </optgroup>
+            </select>
+          </div>
+          <button
+            type="button"
+            className="btn primary"
+            style={{padding:'7px 16px',display:'flex',alignItems:'center',gap:6,whiteSpace:'nowrap'}}
+            disabled={!selectedBunchBooks.length}
+            onClick={()=>{
+              const toAdd = selectedBunchBooks.map(b=>b.id);
+              const currentAllowed = values.allowedBooks || [];
+              const merged = Array.from(new Set([...currentAllowed, ...toAdd]));
+              const diff = merged.length - currentAllowed.length;
+              set('allowedBooks', merged);
+              setBunchFeedback(diff > 0 ? `✓ Added ${diff} book(s) from bunch!` : 'All books from this bunch are already assigned.');
+              setTimeout(()=>setBunchFeedback(''),2500);
+              setSelBunchKey('');
+            }}
+          >
+            <Boxes size={13}/> Add Bunch ({selectedBunchBooks.length} books)
+          </button>
+        </div>
+
+        {/* Bunch Preview Details */}
+        {selectedBunchBooks.length > 0 && (
+          <div style={{marginTop:8,padding:'8px 10px',background:'#f8f7f2',border:'1px solid #ebe5d8',borderRadius:6,fontSize:11}}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:4}}>
+              <span style={{fontWeight:600,color:'#264333'}}>Bunch preview ({selectedBunchBooks.length} titles):</span>
+              <span style={{fontWeight:700,color:'#3a6647'}}>
+                Total: ₹{selectedBunchBooks.reduce((sum,b)=>sum+(b.price||0),0).toLocaleString('en-IN')}
+              </span>
+            </div>
+            <div style={{display:'flex',gap:5,flexWrap:'wrap'}}>
+              {selectedBunchBooks.map(b=>(
+                <span key={b.id} style={{background:'#fff',border:'1px solid #d5cfc3',borderRadius:4,padding:'2px 6px',fontSize:10,color:'#445247'}}>
+                  {b.title} <span style={{color:'#778279'}}>({b.className} · ₹{b.price})</span>
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    )}
+
+    {bunchFeedback && (
+      <div style={{fontSize:11,color:'#245a33',fontWeight:600,background:'#eaf5ec',padding:'5px 10px',borderRadius:6,marginBottom:8}}>
+        {bunchFeedback}
+      </div>
+    )}
+
+    {/* Assigned Books Checklist / Pills */}
+    <div style={{marginTop:6}}>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6}}>
+        <div style={{fontSize:11,fontWeight:600,color:'#536157',display:'flex',alignItems:'center',gap:5}}>
+          <span>Currently Assigned Books:</span>
+          <b style={{color:'#264333'}}>{(values.allowedBooks||[]).length}</b>
+          {(values.allowedBooks||[]).length > 0 && (
+            <span style={{color:'#8a9389',fontSize:10}}>
+              (Total: ₹{(values.allowedBooks||[]).reduce((sum:number,id:string)=>{
+                const bk=data.books.find(x=>x.id===id);
+                return sum + (bk?.price || 0);
+              },0).toLocaleString('en-IN')})
+            </span>
+          )}
+        </div>
+        {(values.allowedBooks||[]).length > 0 && (
+          <button
+            type="button"
+            onClick={()=>set('allowedBooks',[])}
+            style={{border:'none',background:'none',color:'#a24840',fontSize:10,fontWeight:600,cursor:'pointer',textDecoration:'underline',padding:0}}
+          >
+            Clear all
+          </button>
+        )}
+      </div>
+
+      {(values.allowedBooks||[]).length === 0 ? (
+        <div style={{padding:'12px',background:'#fff',border:'1px dashed #d5cfc3',borderRadius:6,textAlign:'center',color:'#8a9389',fontSize:11}}>
+          No books assigned yet. Add books individually using <b>Single Book</b> or add an entire set with <b>Bunch Option</b> above.
+        </div>
+      ) : (
+        <div className="checks" style={{display:'flex',flexWrap:'wrap',gap:6}}>
+          {(values.allowedBooks||[]).map((id:string)=>{
+            const b=data.books.find(x=>x.id===id);
+            return (
+              <label className="check-pill" key={id} style={{display:'flex',alignItems:'center',gap:6,background:'#fff',border:'1px solid #c9d5cb',borderRadius:6,padding:'4px 8px'}}>
+                <input
+                  type="checkbox"
+                  checked
+                  onChange={()=>set('allowedBooks',values.allowedBooks.filter((x:string)=>x!==id))}
+                  style={{accentColor:'#315a41'}}
+                />
+                <span style={{fontWeight:600,color:'#264333',fontSize:11}}>{b?.title || id}</span>
+                {b && (
+                  <span style={{fontSize:9,color:'#778279',background:'#f0efe6',padding:'1px 5px',borderRadius:4}}>
+                    {b.className} · ₹{b.price}
+                  </span>
+                )}
+              </label>
+            );
+          })}
+        </div>
+      )}
+    </div>
+
+    <span className="muted" style={{fontSize:10,marginTop:8,display:'block',color:'#778279'}}>
+      Families can only purchase these selected titles. You can mix bunches and individual titles freely.
+    </span>
+  </div>
+</div>}
   {kind==='book'&&<div className="form-grid"><div className="field full"><label>Book title *</label><input required value={values.title} onChange={e=>set('title',e.target.value)} placeholder="Title as it appears on the cover"/></div><div className="field full"><label>Publication *</label><div style={{display:'flex',gap:8,alignItems:'flex-start'}}><select style={{flex:1}} value={values.publication} onChange={e=>set('publication',e.target.value)}>{pubs.map(p=><option key={p}>{p}</option>)}</select><button type="button" title="Add new publication" style={{flexShrink:0,display:'flex',alignItems:'center',gap:5,padding:'8px 12px',background:'#f0efe6',border:'1px solid #d5cfc3',borderRadius:7,cursor:'pointer',fontSize:12,color:'#3a5241',fontWeight:600,whiteSpace:'nowrap'}} onClick={()=>setShowPubInput(v=>!v)}><PlusCircle size={14}/> Add publication</button></div>{showPubInput&&<div style={{display:'flex',gap:8,marginTop:8,alignItems:'center'}}><input style={{flex:1,fontSize:13,padding:'7px 10px',border:'1px solid #d5cfc3',borderRadius:7,outline:'none'}} placeholder="e.g. Oxford University Press" value={newPubInput} onChange={e=>setNewPubInput(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'){e.preventDefault();if(newPubInput.trim()){onAddPub(newPubInput.trim());set('publication',newPubInput.trim());setNewPubInput('');setShowPubInput(false);}}}}/><button type="button" style={{padding:'7px 14px',background:'#3a5241',color:'#fff',border:'none',borderRadius:7,cursor:'pointer',fontWeight:600,fontSize:12}} onClick={()=>{if(newPubInput.trim()){onAddPub(newPubInput.trim());set('publication',newPubInput.trim());setNewPubInput('');setShowPubInput(false);}}}>Add</button><button type="button" style={{padding:'7px 12px',background:'transparent',border:'1px solid #d5cfc3',borderRadius:7,cursor:'pointer',fontSize:12,color:'#536157'}} onClick={()=>{setShowPubInput(false);setNewPubInput('');}}>Cancel</button></div>}</div><div className="field"><label>Subject</label><input value={values.subject} onChange={e=>set('subject',e.target.value)} placeholder="Mathematics"/></div><div className="field"><label>Class</label><select value={values.className} onChange={e=>set('className',e.target.value)}>{'Pre Nur,Nursery,LKG,UKG'.split(',').concat(Array.from({length:12},(_,i)=>`Class ${i+1}`)).map(x=><option key={x}>{x}</option>)}</select></div><div className="field"><label>ISBN</label><input value={values.isbn} onChange={e=>set('isbn',e.target.value)} placeholder="978-…"/></div><div className="field"><label>SKU *</label><input required value={values.sku} onChange={e=>set('sku',e.target.value)} placeholder="RDS-MTH-08"/></div><div className="field"><label>Price (₹) *</label><input required type="number" min="0" step="1" value={values.price} onChange={e=>set('price',e.target.value)} placeholder="0"/></div><div className="field"><label>Units in stock</label><input type="number" min="0" value={values.stock} onChange={e=>set('stock',e.target.value)}/></div><div className="field"><label>Low-stock threshold</label><input type="number" min="0" value={values.lowStockThreshold} onChange={e=>set('lowStockThreshold',e.target.value)}/></div><div className="field"><label>Catalog status</label><select value={values.status} onChange={e=>set('status',e.target.value)}><option>Active</option><option>Draft</option><option>Archived</option></select></div></div>}
   {kind==='offer'&&<div className="form-grid"><div className="field full"><label>Offer name *</label><input required value={values.title} onChange={e=>set('title',e.target.value)} placeholder="A stronger start in maths"/></div><div className="field"><label>Discount (%) *</label><input required type="number" min="1" max="90" value={values.discountPercent} onChange={e=>set('discountPercent',e.target.value)}/></div><div className="field"><label>Status</label><select value={values.status} onChange={e=>set('status',e.target.value)}><option>Active</option><option>Scheduled</option><option>Ended</option></select></div><div className="field"><label>Start date</label><input required type="date" value={values.startDate} onChange={e=>set('startDate',e.target.value)}/></div><div className="field"><label>End date</label><input required type="date" min={values.startDate} value={values.endDate} onChange={e=>set('endDate',e.target.value)}/></div><div className="field full"><label>Included books</label><div className="checks">{data.books.map(b=><label className="check-pill" key={b.id}><input type="checkbox" checked={values.bookIds.includes(b.id)} onChange={e=>set('bookIds',e.target.checked?[...values.bookIds,b.id]:values.bookIds.filter((x:string)=>x!==b.id))}/>{b.title}</label>)}</div></div></div>}
   {kind==='purchase'&&<div className="form-grid"><div className="field full"><label>Wholesaler Name *</label><input required value={values.manufacturer} onChange={e=>set('manufacturer',e.target.value)} placeholder="e.g. Apex Distributors"/></div><div className="field full"><label>Book</label><select required value={values.bookId} onChange={e=>set('bookId',e.target.value)}><option value="">Select a catalog book</option>{data.books.map(b=><option key={b.id} value={b.id}>{b.title} ({b.className})</option>)}</select></div><div className="field"><label>Qty Purchased</label><input type="number" required value={values.qtyPurchased} onChange={e=>set('qtyPurchased',e.target.value)}/></div><div className="field"><label>Amount Paid (₹)</label><input type="number" required value={values.amountPaid} onChange={e=>set('amountPaid',e.target.value)}/></div><div className="field"><label>Amount Due (₹)</label><input type="number" required value={values.amountDue} onChange={e=>set('amountDue',e.target.value)}/></div><div className="field"><label>Payment Status</label><select value={values.status} onChange={e=>set('status',e.target.value)}><option>Paid</option><option>Partial</option><option>Pending</option></select></div><div className="field"><label>Date</label><input type="date" required value={values.date} onChange={e=>set('date',e.target.value)}/></div></div>}
