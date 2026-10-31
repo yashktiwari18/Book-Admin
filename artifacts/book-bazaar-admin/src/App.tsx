@@ -7,7 +7,7 @@ import { Link, Route, Switch, useLocation, Router as WouterRouter } from 'wouter
 import { LayoutDashboard, Truck, Building2, UsersRound, BookOpen, Tags, Boxes, Search, Plus, Pencil, Trash2, ArrowUpRight, ArrowRight, Menu, X, Bell, TriangleAlert, PackageCheck, Library, Check, Minus, Save, CalendarDays, PlusCircle, Users2, FileOutput, FileText, ArrowDownLeft, RotateCcw, ClipboardList, FilePen, ShoppingBag, Package, Smartphone, Wallet, ChevronDown, FileInput, ArrowUpLeft, RotateCw, ClipboardCheck, RefreshCcw, Download, Share2, Eye, Printer, ChevronLeft, KeyRound, EyeOff, Lock, GraduationCap, LogOut, LogIn, Copy } from 'lucide-react';
 import NotFound from '@/pages/not-found';
 
-type Customer = { id:string; name:string; email:string; phone:string; school:string; className:string; status:'Active'|'Pending'|'Inactive'; allowedPublications:string[]; allowedBooks?:string[]; joinedAt:string; amountPaid?:number; amountDue?:number; password?:string; loginId?:string };
+type Customer = { id:string; name:string; email:string; phone:string; school:string; className:string; status:'Active'|'Pending'|'Inactive'; allowedPublications:string[]; allowedBooks?:string[]; joinedAt:string; amountPaid?:number; amountDue?:number; password?:string; loginId?:string; userId?:string };
 type Book = { id:string; title:string; author:string; publication:string; subject:string; className:string; isbn:string; sku:string; price:number; stock:number; lowStockThreshold:number; status:'Active'|'Draft'|'Archived' };
 type Offer = { id:string; title:string; bookIds:string[]; discountPercent:number; startDate:string; endDate:string; status:'Active'|'Scheduled'|'Ended' };
 type Purchase = { id:string; manufacturer:string; bookId:string; qtyPurchased:number; qtySold:number; amountPaid:number; amountDue:number; status:'Paid'|'Partial'|'Pending'; date:string };
@@ -55,7 +55,7 @@ const seed:Dataset={
 };
 const queryClient=new QueryClient();
 const money=(n:number)=>`₹${Number(n||0).toLocaleString('en-IN')}`;
-const readStore=():Dataset=>{try{const value=localStorage.getItem('bookbazaar-admin-v1');if(!value)return seed;const parsed=JSON.parse(value);return {...seed,...parsed,customers:(parsed.customers||seed.customers).map((c:Customer)=>({...c,password:c.password||(`${(c.name||'Student').split(' ')[0]}@123`),loginId:c.loginId||(c.email?c.email.split('@')[0]:c.id)})),purchases:parsed.purchases||seed.purchases,bunches:(parsed.bunches&&parsed.bunches.length)?parsed.bunches:DEFAULT_BUNCHES};}catch{return seed;}};
+const readStore=():Dataset=>{try{const value=localStorage.getItem('bookbazaar-admin-v1');if(!value)return seed;const parsed=JSON.parse(value);return {...seed,...parsed,customers:(parsed.customers||seed.customers).map((c:Customer)=>({...c,loginId:c.loginId||c.userId||(c.email?c.email.split('@')[0]:c.id),password:c.password||'Pass@123'})),purchases:parsed.purchases||seed.purchases,bunches:(parsed.bunches&&parsed.bunches.length)?parsed.bunches:DEFAULT_BUNCHES};}catch{return seed;}};
 const idFor=(prefix:string)=>`${prefix}-${Math.random().toString(36).slice(2,7).toUpperCase()}`;
 
 const SALE_SUB = [
@@ -3001,22 +3001,111 @@ function AddPartyForm({ initial, onSave, onClose }: { initial: Party | null; onS
   const [name, setName] = useState(initial?.name || '');
   const [phone, setPhone] = useState(initial?.phone || '');
   const [billingName, setBillingName] = useState(initial?.billingName || '');
+  const [email, setEmail] = useState(initial?.email || '');
+  const [userId, setUserId] = useState(initial?.userId || '');
+  const [password, setPassword] = useState(initial?.password || '');
+  const [showPassword, setShowPassword] = useState(false);
+
+  const handleNameChange = (val: string) => {
+    setName(val);
+    if (!initial && !userId) {
+      const slug = val.trim().toLowerCase().replace(/[^a-z0-9]/g, '.').replace(/\.+/g, '.').replace(/^\.|\.$/g, '');
+      setUserId(slug);
+    }
+  };
+
   const handleSave = () => {
     if (!name.trim()) return;
-    onSave({ id: initial?.id || idFor('PTY'), name: name.trim(), phone, billingName: billingName || name.trim(), lastDate: today, transactions: initial?.transactions || [] });
+    const finalUserId = userId.trim() || (phone ? phone.replace(/\D/g, '') : name.trim().toLowerCase().replace(/[^a-z0-9]/g, ''));
+    const finalPass = password.trim() || 'Party@123';
+    onSave({
+      id: initial?.id || idFor('PTY'),
+      name: name.trim(),
+      phone,
+      billingName: billingName || name.trim(),
+      email,
+      userId: finalUserId,
+      password: finalPass,
+      lastDate: today,
+      transactions: initial?.transactions || []
+    });
   };
+
   return (
     <div className="modal-backdrop" onMouseDown={e => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="modal" role="dialog" aria-modal="true">
         <div className="modal-head">
-          <div><h2>{initial ? 'Edit Party' : 'Add New Party'}</h2><p>Name, contact, and billing details</p></div>
+          <div><h2>{initial ? 'Edit Party' : 'Add New Party'}</h2><p>Name, contact, and user login credentials</p></div>
           <button type="button" className="icon-button" onClick={onClose} aria-label="Close"><X /></button>
         </div>
         <div className="modal-body">
           <div className="form-grid">
-            <div className="field full"><label>Party Name *</label><input required value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Avni Prakashan Pvt. Ltd." /></div>
+            <div className="field full"><label>Party Name *</label><input required value={name} onChange={e => handleNameChange(e.target.value)} placeholder="e.g. Avni Prakashan Pvt. Ltd." /></div>
             <div className="field"><label>Billing Name (Optional)</label><input value={billingName} onChange={e => setBillingName(e.target.value)} placeholder="Same as party name" /></div>
             <div className="field"><label>Phone Number</label><input value={phone} onChange={e => setPhone(e.target.value)} placeholder="+91 00000 00000" /></div>
+            <div className="field full"><label>Email Address (Optional)</label><input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="contact@party.com" /></div>
+
+            {/* User Login Credentials Card */}
+            <div className="field full" style={{background:'#f6f9f6',border:'1px solid #c9ddcd',borderRadius:9,padding:'12px 14px',marginTop:4}}>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
+                <div style={{display:'flex',alignItems:'center',gap:6}}>
+                  <KeyRound size={15} style={{color:'#264333'}}/>
+                  <span style={{fontSize:11,fontWeight:700,color:'#264333',letterSpacing:'0.4px',textTransform:'uppercase'}}>
+                    User Login Credentials (User ID & Password)
+                  </span>
+                </div>
+                <span style={{fontSize:10,color:'#526b57'}}>For user login & account access</span>
+              </div>
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
+                <div className="field">
+                  <label style={{fontSize:10,fontWeight:700,color:'#59685c'}}>USER ID / USERNAME *</label>
+                  <input
+                    required
+                    value={userId}
+                    onChange={e => setUserId(e.target.value)}
+                    placeholder="e.g. avni.prakashan"
+                  />
+                  <span className="muted" style={{fontSize:9}}>User can log in using this ID</span>
+                </div>
+                <div className="field">
+                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                    <label style={{fontSize:10,fontWeight:700,color:'#59685c',margin:0}}>PASSWORD *</label>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const chars = 'abcdefghjkmnpqrstuvwxyz23456789';
+                        let auto = 'Pass@';
+                        for (let i = 0; i < 4; i++) auto += chars[Math.floor(Math.random() * chars.length)];
+                        setPassword(auto);
+                        setShowPassword(true);
+                      }}
+                      style={{background:'none',border:'none',color:'#3a6647',fontSize:10,fontWeight:600,cursor:'pointer',textDecoration:'underline',padding:0}}
+                    >
+                      Auto-generate
+                    </button>
+                  </div>
+                  <div style={{position:'relative',display:'flex',alignItems:'center'}}>
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      required
+                      value={password}
+                      onChange={e => setPassword(e.target.value)}
+                      placeholder="Set login password"
+                      style={{paddingRight:36}}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword((v: boolean) => !v)}
+                      style={{position:'absolute',right:8,background:'none',border:'none',color:'#778279',cursor:'pointer',padding:2}}
+                      title={showPassword ? 'Hide password' : 'Show password'}
+                    >
+                      {showPassword ? <EyeOff size={14}/> : <Eye size={14}/>}
+                    </button>
+                  </div>
+                  <span className="muted" style={{fontSize:9}}>Password for user login</span>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
         <div className="modal-foot">
@@ -3191,6 +3280,19 @@ function PartiesPage({ data }: { data: Dataset }) {
                 <div>
                   <div style={{ fontWeight: 700, fontSize: 14, color: '#1e3d2c' }}>{party.name}</div>
                   <div style={{ fontSize: 11, color: '#8a9389', marginTop: 2 }}>{lastTx ? formatDate(lastTx.date) : 'No transactions'}</div>
+                  {party.userId && (
+                    <div style={{ fontSize: 11, color: '#2b523b', marginTop: 5, display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                      <KeyRound size={11} style={{ color: '#3a6647' }} />
+                      <span style={{ fontSize: 10, fontWeight: 700, color: '#536157' }}>User ID:</span>
+                      <code style={{ fontSize: 10, background: '#f0efe6', padding: '1px 5px', borderRadius: 4, fontFamily: 'monospace', color: '#1c3829' }}>{party.userId}</code>
+                      {party.password && (
+                        <>
+                          <span style={{ fontSize: 10, fontWeight: 700, color: '#536157', marginLeft: 4 }}>Pass:</span>
+                          <code style={{ fontSize: 10, background: '#f0efe6', padding: '1px 5px', borderRadius: 4, fontFamily: 'monospace', color: '#1c3829' }}>{party.password}</code>
+                        </>
+                      )}
+                    </div>
+                  )}
                 </div>
                 <div style={{ textAlign: 'right' }}>
                   <div style={{ fontSize: 15, fontWeight: 700, color: payable > 0 ? '#a24840' : '#3a6647' }}>{money(payable)}</div>
@@ -3204,396 +3306,6 @@ function PartiesPage({ data }: { data: Dataset }) {
 
       {showAddParty && <AddPartyForm initial={editingParty} onSave={saveParty} onClose={() => { setShowAddParty(false); setEditingParty(null); }} />}
     </main>
-  );
-}
-
-/* ─── Customer / Student Purchase Portal ───────────────────────────── */
-function CustomerPortal({ data }: { data: Dataset }) {
-  const [currentUser, setCurrentUser] = useState<Customer | null>(() => {
-    const savedId = sessionStorage.getItem('bookbazaar-current-student-id');
-    return savedId ? (data.customers.find(c => c.id === savedId) || null) : null;
-  });
-  const [loginIdentifier, setLoginIdentifier] = useState('');
-  const [password, setPassword] = useState('');
-  const [loginError, setLoginError] = useState('');
-  const [selectedBooks, setSelectedBooks] = useState<string[]>([]);
-  const [orderNotice, setOrderNotice] = useState('');
-  const [paymentMode, setPaymentMode] = useState('UPI');
-
-  const handleLogin = (e: FormEvent) => {
-    e.preventDefault();
-    setLoginError('');
-    const input = loginIdentifier.trim().toLowerCase();
-    const pass = password.trim();
-    const found = data.customers.find(c =>
-      (c.email.toLowerCase() === input || (c.loginId && c.loginId.toLowerCase() === input) || c.id.toLowerCase() === input) &&
-      (c.password === pass || (!c.password && pass === 'Book@123') || pass === `${c.name.split(' ')[0]}@123`)
-    );
-    if (!found) {
-      setLoginError('Invalid Email / Login ID or Password. Please check with your school bookstore.');
-      return;
-    }
-    setCurrentUser(found);
-    sessionStorage.setItem('bookbazaar-current-student-id', found.id);
-  };
-
-  const handleLogout = () => {
-    setCurrentUser(null);
-    sessionStorage.removeItem('bookbazaar-current-student-id');
-  };
-
-  // Determine which books are assigned to this student
-  const assignedBooks = useMemo(() => {
-    if (!currentUser) return [];
-    if (currentUser.allowedBooks && currentUser.allowedBooks.length > 0) {
-      return currentUser.allowedBooks.map(id => data.books.find(b => b.id === id)).filter(Boolean) as Book[];
-    }
-    // Fallback: match by class or publications
-    return data.books.filter(b => b.className === currentUser.className || currentUser.allowedPublications.includes(b.publication));
-  }, [currentUser, data.books]);
-
-  // Default select all assigned books when logged in
-  useEffect(() => {
-    if (currentUser && assignedBooks.length > 0 && selectedBooks.length === 0) {
-      setSelectedBooks(assignedBooks.map(b => b.id));
-    }
-  }, [currentUser, assignedBooks]);
-
-  const selectedTotal = useMemo(() => {
-    return selectedBooks.reduce((sum, bid) => {
-      const bk = data.books.find(b => b.id === bid);
-      return sum + (bk?.price || 0);
-    }, 0);
-  }, [selectedBooks, data.books]);
-
-  const handlePlaceOrder = () => {
-    if (!currentUser || selectedBooks.length === 0) return;
-    const invItems: InvoiceItem[] = selectedBooks.map(bid => {
-      const bk = data.books.find(b => b.id === bid);
-      return {
-        id: idFor('ITM'),
-        bookId: bid,
-        name: bk?.title || bid,
-        qty: 1,
-        price: bk?.price || 0,
-        discountPct: 0
-      };
-    });
-
-    const newInvoice: SaleInvoiceType = {
-      id: idFor('INV'),
-      invoiceNo: `INV-${Math.floor(1000 + Math.random() * 9000)}`,
-      date: today,
-      time: new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true }),
-      customerName: currentUser.name,
-      billingName: currentUser.name,
-      phone: currentUser.phone,
-      email: currentUser.email,
-      partyBalance: currentUser.amountDue || 0,
-      billingAddress: { line1: currentUser.school, line2: currentUser.className, city: 'Delhi', state: 'Delhi', pincode: '110001' },
-      shippingAddress: { line1: currentUser.school, line2: currentUser.className, city: 'Delhi', state: 'Delhi', pincode: '110001' },
-      shipSameAsBill: true,
-      items: invItems,
-      discountPct: 0,
-      shipping: 0,
-      roundOff: false,
-      received: paymentMode === 'Cash on Delivery' ? 0 : selectedTotal,
-      paymentType: paymentMode,
-      paymentRef: paymentMode === 'UPI' ? `UPI-${Math.random().toString(36).slice(2, 8).toUpperCase()}` : '',
-      notes: `Student portal order placed by ${currentUser.name} for ${currentUser.className}`,
-      terms: 'Thank you for your order. School pack will be dispatched directly to your student desk.',
-      status: paymentMode === 'Cash on Delivery' ? 'Unpaid' : 'Paid'
-    };
-
-    try {
-      const existingInvoices: SaleInvoiceType[] = JSON.parse(localStorage.getItem('bookbazaar-invoices-v1') || '[]');
-      localStorage.setItem('bookbazaar-invoices-v1', JSON.stringify([newInvoice, ...existingInvoices]));
-    } catch {}
-
-    setOrderNotice(`🎉 Order successfully placed for ${invItems.length} books! Invoice ${newInvoice.invoiceNo} has been generated.`);
-  };
-
-  // Past student invoices
-  const studentInvoices = useMemo(() => {
-    if (!currentUser) return [];
-    try {
-      const all: SaleInvoiceType[] = JSON.parse(localStorage.getItem('bookbazaar-invoices-v1') || '[]');
-      return all.filter(inv => inv.customerName.toLowerCase() === currentUser.name.toLowerCase() || inv.phone === currentUser.phone || inv.email === currentUser.email);
-    } catch {
-      return [];
-    }
-  }, [currentUser, orderNotice]);
-
-  return (
-    <div style={{ minHeight: '100vh', background: '#f5f3ec', color: '#1e3d2c', fontFamily: 'var(--app-font-sans)' }}>
-      {/* Top Navbar */}
-      <header style={{ background: '#1c3829', color: '#fff', padding: '14px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <div style={{ width: 34, height: 34, borderRadius: 8, background: '#e8ddcb', color: '#1c3829', fontWeight: 900, display: 'grid', placeItems: 'center', fontSize: 18 }}>b</div>
-          <div>
-            <div style={{ fontSize: 16, fontWeight: 700, letterSpacing: '0.3px' }}>Book Bazaar</div>
-            <div style={{ fontSize: 10, color: '#a6c0b0', letterSpacing: '1px', textTransform: 'uppercase' }}>Student & Family Purchase Portal</div>
-          </div>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          {currentUser && (
-            <div style={{ textAlign: 'right', marginRight: 10 }}>
-              <div style={{ fontSize: 13, fontWeight: 700 }}>{currentUser.name}</div>
-              <div style={{ fontSize: 10, color: '#9bc4a8' }}>{currentUser.school} · {currentUser.className}</div>
-            </div>
-          )}
-          {currentUser ? (
-            <button onClick={handleLogout} className="btn" style={{ background: '#29543c', color: '#fff', border: '1px solid #3c7353', fontSize: 11, padding: '6px 12px', display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer' }}>
-              <LogOut size={13}/> Log Out
-            </button>
-          ) : null}
-          <Link href="/" className="btn" style={{ background: '#fff', color: '#1c3829', border: 'none', fontSize: 11, fontWeight: 700, padding: '6px 14px', textDecoration: 'none' }}>
-            Store Workspace →
-          </Link>
-        </div>
-      </header>
-
-      {/* Main Content Area */}
-      <main style={{ maxWidth: 900, margin: '24px auto', padding: '0 16px' }}>
-        {!currentUser ? (
-          /* Login Screen */
-          <div style={{ maxWidth: 440, margin: '40px auto', background: '#fff', borderRadius: 14, border: '1px solid #e5ded2', padding: 28, boxShadow: '0 10px 30px rgba(0,0,0,0.06)' }}>
-            <div style={{ textAlign: 'center', marginBottom: 22 }}>
-              <div style={{ width: 48, height: 48, borderRadius: 24, background: '#eef5f0', color: '#244331', margin: '0 auto 12px', display: 'grid', placeItems: 'center' }}>
-                <GraduationCap size={26}/>
-              </div>
-              <h1 style={{ fontSize: 22, fontWeight: 700, color: '#1c3829', margin: '0 0 6px', fontFamily: 'var(--app-font-serif)' }}>Student & Parent Login</h1>
-              <p style={{ fontSize: 12, color: '#6d756e', margin: 0 }}>
-                Sign in with your Email ID or Login ID and Password to purchase your child's assigned school books.
-              </p>
-            </div>
-
-            {loginError && (
-              <div style={{ background: '#fdf2f2', border: '1px solid #f8b4b4', color: '#9b1c1c', borderRadius: 8, padding: '10px 14px', fontSize: 12, marginBottom: 16 }}>
-                {loginError}
-              </div>
-            )}
-
-            <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-              <div className="field">
-                <label style={{ fontSize: 11, fontWeight: 700, color: '#4a574d' }}>EMAIL ADDRESS OR LOGIN ID *</label>
-                <input
-                  required
-                  placeholder="e.g. aarav.mehta@gmail.com or aarav.mehta"
-                  value={loginIdentifier}
-                  onChange={e => setLoginIdentifier(e.target.value)}
-                  style={{ height: 38, fontSize: 13 }}
-                />
-              </div>
-              <div className="field">
-                <label style={{ fontSize: 11, fontWeight: 700, color: '#4a574d' }}>PASSWORD *</label>
-                <input
-                  required
-                  type="password"
-                  placeholder="Enter your customer password"
-                  value={password}
-                  onChange={e => setPassword(e.target.value)}
-                  style={{ height: 38, fontSize: 13 }}
-                />
-              </div>
-              <button type="submit" className="btn primary" style={{ height: 42, fontSize: 14, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 4 }}>
-                <LogIn size={15}/> Log In to Purchase Books
-              </button>
-            </form>
-
-            {/* Quick Demo Login Pills for Instant Testing */}
-            <div style={{ marginTop: 24, paddingTop: 18, borderTop: '1px solid #eee9df' }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: '#8a9389', textTransform: 'uppercase', marginBottom: 10, textAlign: 'center' }}>
-                Quick Test Accounts (Click to Fill & Sign In):
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                {data.customers.slice(0, 3).map(c => (
-                  <button
-                    key={c.id}
-                    type="button"
-                    onClick={() => {
-                      setLoginIdentifier(c.loginId || c.email);
-                      setPassword(c.password || 'Aarav@123');
-                      setCurrentUser(c);
-                      sessionStorage.setItem('bookbazaar-current-student-id', c.id);
-                    }}
-                    style={{ background: '#f8f6f0', border: '1px solid #e2ded2', borderRadius: 7, padding: '7px 12px', textAlign: 'left', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
-                  >
-                    <div>
-                      <div style={{ fontSize: 12, fontWeight: 700, color: '#244331' }}>{c.name} ({c.className})</div>
-                      <div style={{ fontSize: 10, color: '#7a857b' }}>ID: {c.loginId || c.email.split('@')[0]} · Pass: {c.password || 'Book@123'}</div>
-                    </div>
-                    <span style={{ fontSize: 10, color: '#3a6647', fontWeight: 600 }}>Login →</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-        ) : (
-          /* Student Dashboard & Purchase Screen */
-          <div>
-            {/* Student Banner */}
-            <div style={{ background: '#fff', border: '1px solid #e5ded2', borderRadius: 12, padding: 20, marginBottom: 20, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 14 }}>
-              <div>
-                <span style={{ fontSize: 11, color: '#8a9389', fontWeight: 700, letterSpacing: '0.8px', textTransform: 'uppercase' }}>STUDENT ACCOUNT</span>
-                <h1 style={{ fontSize: 24, fontWeight: 700, color: '#1c3829', margin: '2px 0 4px', fontFamily: 'var(--app-font-serif)' }}>{currentUser.name}</h1>
-                <div style={{ fontSize: 12, color: '#556358' }}>
-                  <b>School:</b> {currentUser.school} &nbsp;|&nbsp; <b>Class:</b> {currentUser.className} &nbsp;|&nbsp; <b>Login ID:</b> <code style={{ background: '#f0efe6', padding: '1px 5px', borderRadius: 4 }}>{currentUser.loginId || currentUser.email}</code>
-                </div>
-              </div>
-              <div style={{ display: 'flex', gap: 12 }}>
-                <div style={{ background: '#f6f9f6', border: '1px solid #c9ddcd', padding: '10px 16px', borderRadius: 8, textAlign: 'center' }}>
-                  <div style={{ fontSize: 10, color: '#59685c', fontWeight: 700 }}>AMOUNT PAID</div>
-                  <div style={{ fontSize: 16, fontWeight: 800, color: '#244331' }}>{money(currentUser.amountPaid || 0)}</div>
-                </div>
-                {(currentUser.amountDue || 0) > 0 && (
-                  <div style={{ background: '#fdf3f3', border: '1px solid #f2c7c7', padding: '10px 16px', borderRadius: 8, textAlign: 'center' }}>
-                    <div style={{ fontSize: 10, color: '#a24840', fontWeight: 700 }}>OUTSTANDING DUE</div>
-                    <div style={{ fontSize: 16, fontWeight: 800, color: '#a24840' }}>{money(currentUser.amountDue || 0)}</div>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {orderNotice && (
-              <div style={{ background: '#eaf5ec', border: '1px solid #a3cfb0', color: '#1f482d', padding: '12px 16px', borderRadius: 9, marginBottom: 20, display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 600 }}>
-                <Check size={16}/> {orderNotice}
-              </div>
-            )}
-
-            {/* Assigned Books Section */}
-            <div style={{ background: '#fff', border: '1px solid #e5ded2', borderRadius: 12, padding: 22, marginBottom: 20 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-                <div>
-                  <h2 style={{ fontSize: 18, fontWeight: 700, color: '#1c3829', margin: 0, fontFamily: 'var(--app-font-serif)' }}>
-                    📚 Books Assigned to You ({assignedBooks.length})
-                  </h2>
-                  <p style={{ fontSize: 12, color: '#7a857b', margin: '3px 0 0' }}>
-                    Select the titles you want to purchase. The bookshop will prepare and deliver your package.
-                  </p>
-                </div>
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <button
-                    type="button"
-                    onClick={() => setSelectedBooks(assignedBooks.map(b => b.id))}
-                    style={{ background: '#f0efe6', border: '1px solid #dcd7ca', borderRadius: 6, padding: '5px 10px', fontSize: 11, fontWeight: 600, color: '#264333', cursor: 'pointer' }}
-                  >
-                    Select All
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setSelectedBooks([])}
-                    style={{ background: 'none', border: 'none', fontSize: 11, color: '#a24840', cursor: 'pointer', textDecoration: 'underline' }}
-                  >
-                    Clear
-                  </button>
-                </div>
-              </div>
-
-              {assignedBooks.length === 0 ? (
-                <div style={{ padding: 24, textAlign: 'center', color: '#8a9389', fontSize: 13 }}>
-                  No specific titles have been restricted for your account. You can purchase any class titles directly.
-                </div>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                  {assignedBooks.map(b => {
-                    const isSelected = selectedBooks.includes(b.id);
-                    return (
-                      <div
-                        key={b.id}
-                        onClick={() => setSelectedBooks(prev => isSelected ? prev.filter(x => x !== b.id) : [...prev, b.id])}
-                        style={{
-                          border: isSelected ? '1.5px solid #244331' : '1px solid #e6e0d3',
-                          background: isSelected ? '#f8faf8' : '#faf9f5',
-                          borderRadius: 9,
-                          padding: '12px 16px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: 14,
-                          cursor: 'pointer',
-                          transition: 'all 0.15s'
-                        }}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={isSelected}
-                          onChange={() => {}}
-                          style={{ width: 18, height: 18, accentColor: '#244331', cursor: 'pointer' }}
-                        />
-                        <div style={{ flex: 1 }}>
-                          <div style={{ fontSize: 14, fontWeight: 700, color: '#1e3d2c' }}>{b.title}</div>
-                          <div style={{ fontSize: 11, color: '#7a857b', marginTop: 2 }}>
-                            {b.author} · {b.publication} · <span style={{ background: '#e8e6dc', padding: '1px 5px', borderRadius: 4 }}>{b.className}</span>
-                          </div>
-                        </div>
-                        <div style={{ textAlign: 'right' }}>
-                          <div style={{ fontSize: 16, fontWeight: 800, color: '#1c3829' }}>{money(b.price)}</div>
-                          <div style={{ fontSize: 10, color: b.stock > 0 ? '#3a6647' : '#a24840', fontWeight: 600 }}>
-                            {b.stock > 0 ? '✓ In Stock' : 'Pre-order'}
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-
-              {/* Checkout / Order Summary Box */}
-              {selectedBooks.length > 0 && (
-                <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid #e5ded2', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 14 }}>
-                  <div>
-                    <div style={{ fontSize: 11, color: '#8a9389', fontWeight: 600 }}>ORDER TOTAL ({selectedBooks.length} items):</div>
-                    <div style={{ fontSize: 24, fontWeight: 800, color: '#244331' }}>{money(selectedTotal)}</div>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-                    <select
-                      value={paymentMode}
-                      onChange={e => setPaymentMode(e.target.value)}
-                      style={{ padding: '8px 12px', borderRadius: 7, border: '1px solid #d5cfc3', fontSize: 12, background: '#fff', color: '#1e3d2c', fontWeight: 600 }}
-                    >
-                      <option value="UPI">Pay via UPI (Instant)</option>
-                      <option value="Cash on Delivery">Pay at Bookshop Counter (COD)</option>
-                      <option value="Net Banking">Net Banking / Card</option>
-                    </select>
-                    <button
-                      type="button"
-                      onClick={handlePlaceOrder}
-                      className="btn primary"
-                      style={{ padding: '10px 22px', fontSize: 13, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 7 }}
-                    >
-                      <ShoppingBag size={15}/> Place Book Order Now
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Invoices & Order History */}
-            {studentInvoices.length > 0 && (
-              <div style={{ background: '#fff', border: '1px solid #e5ded2', borderRadius: 12, padding: 22 }}>
-                <h3 style={{ fontSize: 16, fontWeight: 700, color: '#1c3829', margin: '0 0 12px', fontFamily: 'var(--app-font-serif)' }}>
-                  🧾 Your Invoices & Past Orders ({studentInvoices.length})
-                </h3>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  {studentInvoices.map(inv => (
-                    <div key={inv.id} style={{ border: '1px solid #e8e4da', borderRadius: 8, padding: '10px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <div>
-                        <div style={{ fontSize: 13, fontWeight: 700, color: '#1e3d2c' }}>Invoice {inv.invoiceNo}</div>
-                        <div style={{ fontSize: 11, color: '#8a9389' }}>{inv.date} · {inv.items.length} titles · Paid via {inv.paymentType}</div>
-                      </div>
-                      <div style={{ textAlign: 'right' }}>
-                        <div style={{ fontSize: 14, fontWeight: 700, color: '#1c3829' }}>{money(calcInvoiceTotal(inv))}</div>
-                        <span className={`pill ${inv.status === 'Paid' ? '' : 'warn'}`} style={{ fontSize: 9 }}>{inv.status}</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-      </main>
-    </div>
   );
 }
 
@@ -3641,7 +3353,7 @@ function AppShell({children}:{children:ReactNode}) {
       <div className="sidebar-bottom">The school bookshop<br/>Every title, in good hands.</div>
     </aside>
     <div className="workspace">
-      <header className="topbar"><div className="top-left"><button className="menu-button" onClick={()=>setMenu(!menu)} aria-label="Toggle menu" data-testid="button-menu">{menu?<X/>:<Menu/>}</button><span className="crumb">Book Bazaar&nbsp;/&nbsp;<b>{allPages[location]||'Workspace'}</b></span></div><div className="top-actions"><Link href="/portal" style={{display:'flex',alignItems:'center',gap:5,background:'#244331',color:'#fff',padding:'5px 11px',borderRadius:7,fontSize:11,fontWeight:600,textDecoration:'none',marginRight:6}}><GraduationCap size={13}/> Student Portal</Link><span className="today">Friday, 14 February</span><Bell size={16}/><div className="avatar">S</div><span>Store team</span></div></header>
+      <header className="topbar"><div className="top-left"><button className="menu-button" onClick={()=>setMenu(!menu)} aria-label="Toggle menu" data-testid="button-menu">{menu?<X/>:<Menu/>}</button><span className="crumb">Book Bazaar&nbsp;/&nbsp;<b>{allPages[location]||'Workspace'}</b></span></div><div className="top-actions"><span className="today">Friday, 14 February</span><Bell size={16}/><div className="avatar">S</div><span>Store team</span></div></header>
       {children}
     </div>
     <nav className="mobile-nav"><div className="mobile-nav-inner">{mobileNav.slice(0,6).map(({to,label,Icon})=><Link key={to} href={to} className={(location===to||(to==='/sale/invoice'&&isSaleActive))?'active':''}><Icon/><span>{label}</span></Link>)}</div></nav>
@@ -3685,7 +3397,6 @@ function AppContent(){
       <Route path="/sale/order"><SaleOrderPage {...context}/></Route>
       <Route path="/sale/challan"><DeliveryChallanPage {...context}/></Route>
       <Route path="/sale/pos"><ComingSoon title="Mobile POS" sub="Quick point-of-sale billing on the go." Icon={Smartphone}/></Route>
-      <Route path="/portal"><CustomerPortal data={data}/></Route>
       <Route path="/purchases"><Purchases {...context}/></Route>
       <Route path="/purchase/bill"><ComingSoon title="Purchase Bill" sub="Create and record bills from your suppliers." Icon={FileInput}/></Route>
       <Route path="/purchase/payment-out"><ComingSoon title="Payment Out" sub="Record outgoing payments to suppliers." Icon={ArrowUpLeft}/></Route>
@@ -3727,7 +3438,7 @@ function Customers(c:Context){
  return <main className="page"><Heading eyebrow="People & permissions" title="Customer accounts" subtitle="Give every family the right access to the books they need."><button className="btn primary" onClick={()=>c.setForm({kind:'customer'})} data-testid="button-add-customer"><Plus/> Add customer</button></Heading>
  <div className="stat-grid"><Stat label="Total Dues" value={money(c.data.customers.reduce((a,b)=>a+(b.amountDue||0),0))} note="Outstanding from families" Icon={Building2} tint="red"/><Stat label="Total Collected" value={money(c.data.customers.reduce((a,b)=>a+(b.amountPaid||0),0))} note="Payments received" Icon={Check} tint="green"/><Stat label="Active Families" value={c.data.customers.filter(x=>x.status==='Active').length.toString()} note="Currently enrolled" Icon={UsersRound} tint="neutral"/></div>
  <div className="toolbar"><SearchBar value={query} onChange={setQuery} placeholder="Search customers, schools, email…"/><select className="filter-select" value={filter} onChange={e=>setFilter(e.target.value)} aria-label="Filter customer status" data-testid="select-customer-status"><option>All statuses</option><option>Active</option><option>Pending</option><option>Inactive</option></select><span className="muted" style={{marginLeft:'auto'}}>{rows.length} accounts</span></div>
- <section className="panel"><div className="table-wrap"><table className="data-table"><thead><tr><th>Customer</th><th>School / class</th><th>Book & Publication access</th><th>Login Credentials</th><th>Payments</th><th>Joined</th><th>Status</th><th></th></tr></thead><tbody>{rows.map(x=><tr key={x.id} data-testid={`row-customer-${x.id}`}><td><div className="book-title">{x.name}</div><div className="muted">{x.email} · {x.phone}</div></td><td>{x.school}<div className="muted">{x.className}</div></td><td>{x.allowedBooks && x.allowedBooks.length > 0 ? (<div style={{display:'flex',gap:4,flexWrap:'wrap',alignItems:'center'}}><span className="pill" style={{background:'#dbebe0',color:'#1c3829',fontWeight:700,fontSize:10}}>📚 {x.allowedBooks.length} {x.allowedBooks.length===1?'book':'books'}</span>{x.allowedBooks.slice(0,2).map(id=>{const bk=c.data.books.find(b=>b.id===id);return <span key={id} className="pill neutral" style={{maxWidth:110,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',fontSize:10}} title={bk?.title||id}>{bk?.title||id}</span>;})}{x.allowedBooks.length>2&&<span className="pill neutral" style={{fontSize:10}}>+{x.allowedBooks.length-2}</span>}</div>) : (<div style={{display:'flex',gap:4,flexWrap:'wrap'}}>{x.allowedPublications.slice(0,2).map(p=><span key={p} className="pill neutral">{p}</span>)}{x.allowedPublications.length>2&&<span className="pill neutral">+{x.allowedPublications.length-2}</span>}{!x.allowedPublications.length&&<span className="muted" style={{fontSize:11}}>All books</span>}</div>)}</td><td><div style={{display:'flex',flexDirection:'column',gap:3}}><div style={{display:'flex',alignItems:'center',gap:5}}><span style={{fontSize:10,fontWeight:700,color:'#536157'}}>ID:</span><code style={{fontSize:10,background:'#f0efe6',padding:'1px 5px',borderRadius:4,color:'#315a41',fontFamily:'monospace'}}>{x.loginId || x.email.split('@')[0]}</code></div><div style={{display:'flex',alignItems:'center',gap:5}}><span style={{fontSize:10,fontWeight:700,color:'#536157'}}>Pass:</span><code style={{fontSize:10,background:'#f0efe6',padding:'1px 5px',borderRadius:4,color:'#315a41',fontFamily:'monospace'}}>{x.password || 'Book@123'}</code></div><button type="button" onClick={()=>{const text=`Book Bazaar Student Login:\nPortal: ${window.location.origin}/portal\nEmail: ${x.email}\nLogin ID: ${x.loginId || x.email.split('@')[0]}\nPassword: ${x.password || 'Book@123'}`;navigator.clipboard.writeText(text);c.setToast(`Copied login details for ${x.name}`);}} style={{border:'none',background:'none',color:'#3a6647',fontSize:10,fontWeight:600,cursor:'pointer',display:'flex',alignItems:'center',gap:4,padding:0,marginTop:2}}><Copy size={11}/> Copy Info</button></div></td><td><div style={{display:'flex',flexDirection:'column',gap:4}}><span style={{fontSize:11,color:'#465d49',fontWeight:600}}>Paid: {money(x.amountPaid||0)}</span>{(x.amountDue||0)>0&&<span style={{fontSize:11,color:'#a24840',fontWeight:600}}>Due: {money(x.amountDue||0)}</span>}</div></td><td>{new Date(`${x.joinedAt}T00:00:00`).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})}</td><td><Pill state={x.status}>{x.status}</Pill></td><td><div className="row-actions"><button className="icon-button" aria-label={`Login as ${x.name}`} title="Open Student Portal as this customer" onClick={()=>{sessionStorage.setItem('bookbazaar-current-student-id',x.id);window.location.href='#/portal';}}><GraduationCap size={14}/></button><button className="icon-button" aria-label={`Edit ${x.name}`} title="Edit customer" onClick={()=>c.edit('customer',x)} data-testid={`button-edit-customer-${x.id}`}><Pencil/></button><button className="icon-button" aria-label={`Remove ${x.name}`} title="Remove customer" onClick={()=>c.setConfirm({kind:'customer',id:x.id,name:x.name})} data-testid={`button-remove-customer-${x.id}`}><Trash2/></button></div></td></tr>)}</tbody></table>{!rows.length&&<TableEmpty label="No matching accounts" detail={query?'Try another name, email or school.':'Create your first customer account to get started.'} Icon={UsersRound} action={!query&&<button className="btn primary" onClick={()=>c.setForm({kind:'customer'})}><Plus/> Add customer</button>}/>}</div></section></main>
+ <section className="panel"><div className="table-wrap"><table className="data-table"><thead><tr><th>Customer</th><th>School / class</th><th>Book & Publication access</th><th>User ID & Password</th><th>Payments</th><th>Joined</th><th>Status</th><th></th></tr></thead><tbody>{rows.map(x=><tr key={x.id} data-testid={`row-customer-${x.id}`}><td><div className="book-title">{x.name}</div><div className="muted">{x.email} · {x.phone}</div></td><td>{x.school}<div className="muted">{x.className}</div></td><td>{x.allowedBooks && x.allowedBooks.length > 0 ? (<div style={{display:'flex',gap:4,flexWrap:'wrap',alignItems:'center'}}><span className="pill" style={{background:'#dbebe0',color:'#1c3829',fontWeight:700,fontSize:10}}>📚 {x.allowedBooks.length} {x.allowedBooks.length===1?'book':'books'}</span>{x.allowedBooks.slice(0,2).map(id=>{const bk=c.data.books.find(b=>b.id===id);return <span key={id} className="pill neutral" style={{maxWidth:110,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',fontSize:10}} title={bk?.title||id}>{bk?.title||id}</span>;})}{x.allowedBooks.length>2&&<span className="pill neutral" style={{fontSize:10}}>+{x.allowedBooks.length-2}</span>}</div>) : (<div style={{display:'flex',gap:4,flexWrap:'wrap'}}>{x.allowedPublications.slice(0,2).map(p=><span key={p} className="pill neutral">{p}</span>)}{x.allowedPublications.length>2&&<span className="pill neutral">+{x.allowedPublications.length-2}</span>}{!x.allowedPublications.length&&<span className="muted" style={{fontSize:11}}>All books</span>}</div>)}</td><td><div style={{display:'flex',flexDirection:'column',gap:3}}><div style={{display:'flex',alignItems:'center',gap:5}}><span style={{fontSize:10,fontWeight:700,color:'#536157'}}>ID:</span><code style={{fontSize:10,background:'#f0efe6',padding:'1px 5px',borderRadius:4,color:'#315a41',fontFamily:'monospace'}}>{x.loginId || x.userId || (x.email ? x.email.split('@')[0] : x.id)}</code></div><div style={{display:'flex',alignItems:'center',gap:5}}><span style={{fontSize:10,fontWeight:700,color:'#536157'}}>Pass:</span><code style={{fontSize:10,background:'#f0efe6',padding:'1px 5px',borderRadius:4,color:'#315a41',fontFamily:'monospace'}}>{x.password || 'Pass@123'}</code></div><button type="button" onClick={()=>{const text=`Customer Login Details:\nName: ${x.name}\nUser ID: ${x.loginId || x.userId || (x.email ? x.email.split('@')[0] : x.id)}\nPassword: ${x.password || 'Pass@123'}`;navigator.clipboard.writeText(text);c.setToast(`Copied login details for ${x.name}`);}} style={{border:'none',background:'none',color:'#3a6647',fontSize:10,fontWeight:600,cursor:'pointer',display:'flex',alignItems:'center',gap:4,padding:0,marginTop:2}}><Copy size={11}/> Copy Info</button></div></td><td><div style={{display:'flex',flexDirection:'column',gap:4}}><span style={{fontSize:11,color:'#465d49',fontWeight:600}}>Paid: {money(x.amountPaid||0)}</span>{(x.amountDue||0)>0&&<span style={{fontSize:11,color:'#a24840',fontWeight:600}}>Due: {money(x.amountDue||0)}</span>}</div></td><td>{new Date(`${x.joinedAt}T00:00:00`).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})}</td><td><Pill state={x.status}>{x.status}</Pill></td><td><div className="row-actions"><button className="icon-button" aria-label={`Edit ${x.name}`} title="Edit customer" onClick={()=>c.edit('customer',x)} data-testid={`button-edit-customer-${x.id}`}><Pencil/></button><button className="icon-button" aria-label={`Remove ${x.name}`} title="Remove customer" onClick={()=>c.setConfirm({kind:'customer',id:x.id,name:x.name})} data-testid={`button-remove-customer-${x.id}`}><Trash2/></button></div></td></tr>)}</tbody></table>{!rows.length&&<TableEmpty label="No matching accounts" detail={query?'Try another name, email or school.':'Create your first customer account to get started.'} Icon={UsersRound} action={!query&&<button className="btn primary" onClick={()=>c.setForm({kind:'customer'})}><Plus/> Add customer</button>}/>}</div></section></main>
 }
 
 
@@ -3925,7 +3636,7 @@ function Inventory(c:Context){
 function Editor({form,data,pubs,onAddPub,onClose,onSave,onSaveBunch}:{form:Exclude<FormState,null>;data:Dataset;pubs:string[];onAddPub:(name:string)=>void;onClose:()=>void;onSave:(kind:any,values:any,original?:any)=>void;onSaveBunch?:(bunch:BookBunch)=>void}){
  const kind=form.kind; const editing=!!form.item; const original=form.item as any;
  const [values,setValues]=useState<Record<string,any>>(()=>{
-   if(kind==='customer')return original?{...original,allowedPublications:[...original.allowedPublications],allowedBooks:original.allowedBooks?[...original.allowedBooks]:[],password:original.password||(`${(original.name||'Student').split(' ')[0]}@123`),loginId:original.loginId||(original.email?original.email.split('@')[0]:'')}:{name:'',email:'',phone:'',school:'',className:'Class 5',status:'Active',allowedPublications:[],allowedBooks:[],password:'Book@123',loginId:''};
+   if(kind==='customer')return original?{...original,allowedPublications:[...original.allowedPublications],allowedBooks:original.allowedBooks?[...original.allowedBooks]:[],loginId:original.loginId||original.userId||(original.email?original.email.split('@')[0]:''),password:original.password||'Pass@123'}:{name:'',email:'',phone:'',school:'',className:'Class 5',status:'Active',allowedPublications:[],allowedBooks:[],loginId:'',password:'Pass@123'};
    if(kind==='book')return original?{...original}:{title:'',publication:pubs[0]||'RD Sharma',subject:'Mathematics',className:'Class 5',isbn:'',sku:'',price:'',stock:0,lowStockThreshold:10,status:'Active'};
    if(kind==='offer')return original?{...original,bookIds:[...original.bookIds]}:{title:'',bookIds:[],discountPercent:10,startDate:today,endDate:'2025-03-15',status:'Active'};
     if(kind==='purchase')return original?{...original}:{manufacturer:'',bookId:'',qtyPurchased:100,amountPaid:0,amountDue:0,status:'Pending',date:today};
@@ -3943,7 +3654,7 @@ function Editor({form,data,pubs,onAddPub,onClose,onSave,onSaveBunch}:{form:Exclu
  const [newBunchClass, setNewBunchClass] = useState('');
  const [newBunchBookIds, setNewBunchBookIds] = useState<string[]>([]);
  const [bunchFeedback, setBunchFeedback] = useState('');
- const [showPassword, setShowPassword] = useState(false);
+ const [showCustomerPassword, setShowCustomerPassword] = useState(false);
 
  const allBunches: BookBunch[] = data.bunches && data.bunches.length ? data.bunches : DEFAULT_BUNCHES;
  const classesWithBooks = Array.from(new Set(data.books.map(b => b.className)))
@@ -3970,8 +3681,8 @@ function Editor({form,data,pubs,onAddPub,onClose,onSave,onSaveBunch}:{form:Exclu
  const desc=kind==='customer'?'Account details and publication permissions':kind==='book'?'Catalog information, pricing, and stock threshold':kind==='offer'?'Choose the books and dates for this offer':kind==='purchase'?'Log a wholesaler purchase and payment status':'Record a stock movement';
  return <div className="modal-backdrop" onMouseDown={e=>{if(e.target===e.currentTarget)onClose()}}><form className="modal" onSubmit={submit} role="dialog" aria-modal="true"><div className="modal-head"><div><h2>{title}</h2><p>{desc}</p></div><button type="button" className="icon-button" onClick={onClose} aria-label="Close"><X/></button></div><div className="modal-body">
   {kind==='customer'&&<div className="form-grid">
-  <div className="field"><label>Full name *</label><input required value={values.name} onChange={e=>set('name',e.target.value)} placeholder="e.g. Aanya Sharma"/></div>
-  <div className="field"><label>Email address *</label><input required type="email" value={values.email} onChange={e=>set('email',e.target.value)} placeholder="family@email.com"/></div>
+  <div className="field"><label>Full name *</label><input required value={values.name} onChange={e=>{const val=e.target.value;set('name',val);if(!editing&&!values.loginId){const autoSlug=val.trim().toLowerCase().replace(/[^a-z0-9]/g,'.').replace(/\.+/g,'.').replace(/^\.|\.$/g,'');set('loginId',autoSlug);set('userId',autoSlug);}}} placeholder="e.g. Aanya Sharma"/></div>
+  <div className="field"><label>Email address *</label><input required type="email" value={values.email} onChange={e=>{set('email',e.target.value);if(!editing&&!values.loginId&&e.target.value){set('loginId',e.target.value.split('@')[0]);set('userId',e.target.value.split('@')[0]);}}} placeholder="family@email.com"/></div>
   <div className="field"><label>Phone number *</label><input required value={values.phone} onChange={e=>set('phone',e.target.value)} placeholder="+91 98xxx xxxxx"/></div>
   <div className="field"><label>School *</label><input required value={values.school} onChange={e=>set('school',e.target.value)} placeholder="School name"/></div>
   <div className="field"><label>Class</label><select value={values.className || 'Class 5'} onChange={e=>set('className',e.target.value)}>{'Pre Nur,Nursery,LKG,UKG'.split(',').concat(Array.from({length:12},(_,i)=>`Class ${i+1}`)).map(x=><option key={x}>{x}</option>)}</select></div>
@@ -3979,30 +3690,33 @@ function Editor({form,data,pubs,onAddPub,onClose,onSave,onSaveBunch}:{form:Exclu
   <div className="field"><label>Amount Paid (₹)</label><input type="number" min="0" value={values.amountPaid ?? ''} onChange={e=>set('amountPaid',e.target.value)}/></div>
   <div className="field"><label>Amount Due (₹)</label><input type="number" min="0" value={values.amountDue ?? ''} onChange={e=>set('amountDue',e.target.value)}/></div>
 
-  {/* Student Portal Login Credentials (ID & Password) */}
+  {/* Customer Login Credentials (User ID & Password) */}
   <div className="field full" style={{background:'#f6f9f6',border:'1px solid #c9ddcd',borderRadius:9,padding:'12px 14px',margin:'2px 0 4px'}}>
     <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
       <div style={{display:'flex',alignItems:'center',gap:6}}>
         <KeyRound size={14} style={{color:'#264333'}}/>
         <span style={{fontSize:11,fontWeight:700,color:'#264333',letterSpacing:'0.4px',textTransform:'uppercase'}}>
-          Student Portal Login Credentials (ID & Password)
+          Customer Login Credentials (User ID & Password)
         </span>
       </div>
-      <span style={{fontSize:10,color:'#526b57'}}>For family to log in & buy assigned books</span>
+      <span style={{fontSize:10,color:'#526b57'}}>Define user ID & password for this customer</span>
     </div>
     <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
       <div className="field">
         <label style={{fontSize:10,fontWeight:700,color:'#59685c'}}>
-          LOGIN ID / USERNAME *
+          USER ID / USERNAME *
         </label>
         <input
           required
           value={values.loginId ?? ''}
-          onChange={e => set('loginId', e.target.value)}
+          onChange={e => {
+            set('loginId', e.target.value);
+            set('userId', e.target.value);
+          }}
           placeholder={values.email ? values.email.split('@')[0] : 'e.g. aanya.sharma'}
         />
         <span className="muted" style={{fontSize:9}}>
-          Student can log in using either this ID or their Email ({values.email || 'email'})
+          User will use this ID to log in
         </span>
       </div>
       <div className="field">
@@ -4017,7 +3731,7 @@ function Editor({form,data,pubs,onAddPub,onClose,onSave,onSaveBunch}:{form:Exclu
               let auto = 'Pass@';
               for (let i = 0; i < 4; i++) auto += chars[Math.floor(Math.random() * chars.length)];
               set('password', auto);
-              setShowPassword(true);
+              setShowCustomerPassword(true);
             }}
             style={{background:'none',border:'none',color:'#3a6647',fontSize:10,fontWeight:600,cursor:'pointer',textDecoration:'underline',padding:0}}
           >
@@ -4026,7 +3740,7 @@ function Editor({form,data,pubs,onAddPub,onClose,onSave,onSaveBunch}:{form:Exclu
         </div>
         <div style={{position:'relative',display:'flex',alignItems:'center'}}>
           <input
-            type={showPassword ? 'text' : 'password'}
+            type={showCustomerPassword ? 'text' : 'password'}
             required
             value={values.password ?? ''}
             onChange={e => set('password', e.target.value)}
@@ -4035,15 +3749,15 @@ function Editor({form,data,pubs,onAddPub,onClose,onSave,onSaveBunch}:{form:Exclu
           />
           <button
             type="button"
-            onClick={() => setShowPassword((v: boolean) => !v)}
+            onClick={() => setShowCustomerPassword((v: boolean) => !v)}
             style={{position:'absolute',right:8,background:'none',border:'none',color:'#778279',cursor:'pointer',padding:2}}
-            title={showPassword ? 'Hide password' : 'Show password'}
+            title={showCustomerPassword ? 'Hide password' : 'Show password'}
           >
-            {showPassword ? <EyeOff size={14}/> : <Eye size={14}/>}
+            {showCustomerPassword ? <EyeOff size={14}/> : <Eye size={14}/>}
           </button>
         </div>
         <span className="muted" style={{fontSize:9}}>
-          Share this password with the family to log in and buy books
+          Password for customer account login
         </span>
       </div>
     </div>
