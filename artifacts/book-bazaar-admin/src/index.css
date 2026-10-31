@@ -79,3 +79,8 @@
   .print-only { display: inline-block !important; }
 }
 .print-only { display: none; }
+
+input[type=number]::-webkit-inner-spin-button,
+input[type=number]::-webkit-outer-spin-button {
+  margin: 0;
+}

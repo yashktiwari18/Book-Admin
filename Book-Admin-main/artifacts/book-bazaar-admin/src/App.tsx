@@ -573,6 +573,330 @@ function SaleInvoicePage(c:Context){
     </main>
   );
 }
+/* ─── Searchable Book Selector Component with Real-Time Search & Scroll ─── */
+function BookSearchSelect({
+  books,
+  value,
+  onChange,
+  placeholder = 'Select book…',
+  disabled = false,
+  style,
+  dropdownWidth,
+}: {
+  books: Book[];
+  value: string;
+  onChange: (bookId: string) => void;
+  placeholder?: string;
+  disabled?: boolean;
+  style?: React.CSSProperties;
+  dropdownWidth?: string | number;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const [highlightIndex, setHighlightIndex] = useState(0);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
+
+  const selectedBook = useMemo(() => books.find(b => b.id === value), [books, value]);
+
+  const filteredBooks = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return books;
+    return books.filter(b =>
+      b.title.toLowerCase().includes(q) ||
+      b.className.toLowerCase().includes(q) ||
+      (b.subject && b.subject.toLowerCase().includes(q)) ||
+      (b.publication && b.publication.toLowerCase().includes(q)) ||
+      (b.author && b.author.toLowerCase().includes(q)) ||
+      (b.sku && b.sku.toLowerCase().includes(q)) ||
+      String(b.price).includes(q)
+    );
+  }, [books, query]);
+
+  useEffect(() => {
+    setHighlightIndex(0);
+  }, [filteredBooks]);
+
+  useEffect(() => {
+    if (!open) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [open]);
+
+  useEffect(() => {
+    if (open) {
+      setTimeout(() => {
+        searchInputRef.current?.focus();
+        searchInputRef.current?.select();
+      }, 40);
+    } else {
+      setQuery('');
+    }
+  }, [open]);
+
+  const handleSelect = (id: string) => {
+    onChange(id);
+    setOpen(false);
+    setQuery('');
+  };
+
+  const handleClear = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onChange('');
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (!open) {
+      if (e.key === 'ArrowDown' || e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        setOpen(true);
+      }
+      return;
+    }
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setHighlightIndex(prev => (prev + 1 < filteredBooks.length ? prev + 1 : 0));
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setHighlightIndex(prev => (prev - 1 >= 0 ? prev - 1 : Math.max(0, filteredBooks.length - 1)));
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      if (filteredBooks.length > 0 && highlightIndex >= 0 && highlightIndex < filteredBooks.length) {
+        handleSelect(filteredBooks[highlightIndex].id);
+      }
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      setOpen(false);
+    }
+  };
+
+  return (
+    <div ref={containerRef} style={{ position: 'relative', width: '100%', ...style }}>
+      {/* Trigger Button */}
+      <div
+        role="combobox"
+        aria-expanded={open}
+        tabIndex={disabled ? -1 : 0}
+        onClick={() => !disabled && setOpen(prev => !prev)}
+        onKeyDown={handleKeyDown}
+        style={{
+          height: 34,
+          padding: '0 10px',
+          background: disabled ? '#f5f4ef' : '#ffffff',
+          border: open ? '1.5px solid #264333' : '1px solid #d5cfc3',
+          borderRadius: 7,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          cursor: disabled ? 'not-allowed' : 'pointer',
+          userSelect: 'none',
+          boxShadow: open ? '0 0 0 2px rgba(38,67,51,0.1)' : 'none',
+          transition: 'all 0.15s ease',
+          fontSize: 13,
+          color: selectedBook ? '#1c3829' : '#777',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 7, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
+          <Search size={13} style={{ color: selectedBook ? '#264333' : '#888', flexShrink: 0 }} />
+          {selectedBook ? (
+            <span style={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#1e3d2c' }}>
+              {selectedBook.title}
+              <span style={{ fontSize: 11, fontWeight: 400, color: '#6d756e', marginLeft: 6 }}>
+                ({selectedBook.className} · ₹{selectedBook.price})
+              </span>
+            </span>
+          ) : (
+            <span style={{ color: '#777', fontSize: 13 }}>{placeholder}</span>
+          )}
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0, marginLeft: 6 }}>
+          {selectedBook && !disabled && (
+            <span
+              onClick={handleClear}
+              title="Clear selection"
+              style={{
+                width: 16,
+                height: 16,
+                borderRadius: '50%',
+                background: '#e5ded2',
+                color: '#555',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: 10,
+                cursor: 'pointer',
+                lineHeight: 1
+              }}
+            >
+              ✕
+            </span>
+          )}
+          <ChevronDown size={14} style={{ color: '#666', transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s ease' }} />
+        </div>
+      </div>
+
+      {/* Dropdown Menu with Dedicated Search Input & Scrollable List */}
+      {open && (
+        <div
+          style={{
+            position: 'absolute',
+            top: 'calc(100% + 4px)',
+            left: 0,
+            zIndex: 9999,
+            width: dropdownWidth || '100%',
+            minWidth: 320,
+            maxWidth: '92vw',
+            background: '#ffffff',
+            border: '1px solid #c9c3b5',
+            borderRadius: 8,
+            boxShadow: '0 10px 28px rgba(0,0,0,0.15), 0 2px 6px rgba(0,0,0,0.06)',
+            padding: 8,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 6
+          }}
+        >
+          {/* Dedicated Search Header & Input */}
+          <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+            <Search size={14} style={{ position: 'absolute', left: 9, color: '#556358', pointerEvents: 'none' }} />
+            <input
+              ref={searchInputRef}
+              type="text"
+              value={query}
+              onChange={e => setQuery(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="Type to search book title, class, author..."
+              style={{
+                width: '100%',
+                height: 32,
+                padding: '0 28px 0 28px',
+                fontSize: 12,
+                borderRadius: 6,
+                border: '1px solid #c8d3cc',
+                outline: 'none',
+                background: '#f8faf8',
+                color: '#1c3829'
+              }}
+            />
+            {query && (
+              <button
+                type="button"
+                onClick={() => {
+                  setQuery('');
+                  searchInputRef.current?.focus();
+                }}
+                style={{
+                  position: 'absolute',
+                  right: 8,
+                  background: 'none',
+                  border: 'none',
+                  color: '#888',
+                  cursor: 'pointer',
+                  padding: 2,
+                  fontSize: 12
+                }}
+                title="Clear search"
+              >
+                ✕
+              </button>
+            )}
+          </div>
+
+          {/* Quick status bar showing count and scroll instruction */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '2px 4px', fontSize: 10, color: '#7a857b', borderBottom: '1px solid #f0eee6' }}>
+            <span>
+              {query ? `Found ${filteredBooks.length} match${filteredBooks.length === 1 ? '' : 'es'}` : `Showing all ${books.length} books`}
+            </span>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+              ↕ Scroll to browse
+            </span>
+          </div>
+
+          {/* Scrollable list of books */}
+          <div
+            ref={listRef}
+            style={{
+              maxHeight: 220,
+              overflowY: 'auto',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 2
+            }}
+          >
+            {filteredBooks.length === 0 ? (
+              <div style={{ padding: '16px 10px', textAlign: 'center', color: '#888', fontSize: 12 }}>
+                <div>No books found matching <b>"{query}"</b></div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setQuery('');
+                    searchInputRef.current?.focus();
+                  }}
+                  style={{ marginTop: 6, background: 'none', border: 'none', color: '#2b523b', textDecoration: 'underline', fontSize: 11, cursor: 'pointer', fontWeight: 600 }}
+                >
+                  View all books
+                </button>
+              </div>
+            ) : (
+              filteredBooks.map((b, idx) => {
+                const isSelected = b.id === value;
+                const isHighlighted = idx === highlightIndex;
+                return (
+                  <div
+                    key={b.id}
+                    onClick={() => handleSelect(b.id)}
+                    onMouseEnter={() => setHighlightIndex(idx)}
+                    style={{
+                      padding: '7px 9px',
+                      borderRadius: 6,
+                      background: isSelected ? '#edf5ef' : isHighlighted ? '#f6f4ee' : 'transparent',
+                      border: isSelected ? '1px solid #c2dec9' : '1px solid transparent',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: 8,
+                      transition: 'background 0.1s ease'
+                    }}
+                  >
+                    <div style={{ flex: 1, overflow: 'hidden' }}>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: '#1c3829', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {b.title}
+                      </div>
+                      <div style={{ fontSize: 10, color: '#737f76', marginTop: 1, display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                        <span style={{ background: '#ebe8dd', color: '#334438', padding: '1px 5px', borderRadius: 4, fontWeight: 600 }}>
+                          {b.className}
+                        </span>
+                        {b.publication && <span>{b.publication}</span>}
+                        {b.author && <span>· {b.author}</span>}
+                      </div>
+                    </div>
+
+                    <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                      <div style={{ fontSize: 13, fontWeight: 800, color: '#1c3829' }}>₹{b.price}</div>
+                      <div style={{ fontSize: 9, color: b.stock > 0 ? '#306441' : '#a24840', fontWeight: 600 }}>
+                        {b.stock > 0 ? `Stock: ${b.stock}` : 'Out of stock'}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function InvoiceForm({data,initial,nextNo,nowTime,onSave,onClose,onDelete}:{data:Dataset;initial:SaleInvoiceType|null;nextNo:string;nowTime:string;onSave:(inv:SaleInvoiceType)=>void;onClose:()=>void;onDelete?:()=>void}){
   const blankAddr=()=>({line1:'',line2:'',city:'',state:'',pincode:''});
   const blank:Omit<SaleInvoiceType,'id'>={invoiceNo:nextNo,date:today,time:nowTime,customerName:'',billingName:'',phone:'',email:'',partyBalance:0,billingAddress:blankAddr(),shippingAddress:blankAddr(),shipSameAsBill:true,items:[],discountPct:0,shipping:0,roundOff:false,received:0,paymentType:'Cash',paymentRef:'',notes:'',terms:'1) Thank you for doing business with us.\n2) E. & O.E.\n3) Goods once sold will not be taken back.',status:'Unpaid'};
@@ -743,27 +1067,52 @@ function InvoiceForm({data,initial,nextNo,nowTime,onSave,onClose,onDelete}:{data
                   Add Single Book Item
                 </span>
               </div>
-              <div style={{display:'grid',gridTemplateColumns:'2fr 0.7fr 1fr 0.7fr auto',gap:8,alignItems:'flex-end'}}>
+              <div style={{display:'grid',gridTemplateColumns:'minmax(180px, 1fr) 72px 96px 72px auto',gap:8,alignItems:'flex-end'}}>
                 <div className="field" style={{marginBottom:0,gap:3}}>
-                  <label style={{fontSize:9,fontWeight:700,color:'#6f786f'}}>BOOK</label>
-                  <select value={selBook} onChange={e=>{setSelBook(e.target.value);const b=data.books.find(b=>b.id===e.target.value);if(b)setSelPrice(b.price);}} style={{height:34}}>
-                    <option value="">Select book…</option>
-                    {data.books.map(b=><option key={b.id} value={b.id}>{b.title} ({b.className} · ₹{b.price})</option>)}
-                  </select>
+                  <label style={{fontSize:9,fontWeight:700,color:'#6f786f',whiteSpace:'nowrap'}}>BOOK</label>
+                  <BookSearchSelect
+                    books={data.books}
+                    value={selBook}
+                    onChange={bookId => {
+                      setSelBook(bookId);
+                      const b = data.books.find(x => x.id === bookId);
+                      if (b) setSelPrice(b.price);
+                    }}
+                    placeholder="Search or select book…"
+                  />
                 </div>
                 <div className="field" style={{marginBottom:0,gap:3}}>
-                  <label style={{fontSize:9,fontWeight:700,color:'#6f786f'}}>QTY</label>
-                  <input type="number" min="1" value={selQty} style={{height:34}} onChange={e=>setSelQty(Number(e.target.value))}/>
+                  <label style={{fontSize:9,fontWeight:700,color:'#6f786f',whiteSpace:'nowrap',textAlign:'center'}}>QTY</label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={selQty}
+                    style={{height:34,padding:'0 4px',textAlign:'center',fontSize:13,fontWeight:600,color:'#1c3829'}}
+                    onChange={e=>setSelQty(Number(e.target.value))}
+                  />
                 </div>
                 <div className="field" style={{marginBottom:0,gap:3}}>
-                  <label style={{fontSize:9,fontWeight:700,color:'#6f786f'}}>PRICE (₹)</label>
-                  <input type="number" min="0" value={selPrice} style={{height:34}} onChange={e=>setSelPrice(Number(e.target.value))}/>
+                  <label style={{fontSize:9,fontWeight:700,color:'#6f786f',whiteSpace:'nowrap',textAlign:'center'}}>PRICE (₹)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={selPrice}
+                    style={{height:34,padding:'0 6px',textAlign:'center',fontSize:13,fontWeight:600,color:'#1c3829'}}
+                    onChange={e=>setSelPrice(Number(e.target.value))}
+                  />
                 </div>
                 <div className="field" style={{marginBottom:0,gap:3}}>
-                  <label style={{fontSize:9,fontWeight:700,color:'#6f786f'}}>DISC %</label>
-                  <input type="number" min="0" max="100" value={selDisc} style={{height:34}} onChange={e=>setSelDisc(Number(e.target.value))}/>
+                  <label style={{fontSize:9,fontWeight:700,color:'#6f786f',whiteSpace:'nowrap',textAlign:'center'}}>DISC %</label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    value={selDisc}
+                    style={{height:34,padding:'0 4px',textAlign:'center',fontSize:13,fontWeight:600,color:'#1c3829'}}
+                    onChange={e=>setSelDisc(Number(e.target.value))}
+                  />
                 </div>
-                <button type="button" className="btn primary" style={{height:34,padding:'0 14px',display:'flex',alignItems:'center',gap:5}} onClick={addItem} disabled={!selBook}>
+                <button type="button" className="btn primary" style={{height:34,padding:'0 14px',display:'flex',alignItems:'center',gap:5,whiteSpace:'nowrap'}} onClick={addItem} disabled={!selBook}>
                   <Plus size={14}/> Add Book
                 </button>
               </div>
@@ -1309,9 +1658,12 @@ function SaleReturnForm({data,initial,nextNo,nowTime,onSave,onClose,onDelete}:{d
           <div style={{marginTop:10,border:'1px solid #e0e0e0',borderRadius:6,padding:'12px'}}>
             <div style={{display:'grid',gridTemplateColumns:'2fr 1fr auto',gap:8,alignItems:'flex-end',marginBottom:8}}>
               <div><div style={{fontSize:11,color:'#888',marginBottom:4}}>Book</div>
-                <select value={selBook} onChange={e=>setSelBook(e.target.value)} style={{width:'100%',border:'1px solid #ddd',borderRadius:5,padding:'8px',fontSize:13,outline:'none'}}>
-                  <option value="">Select book…</option>{data.books.map(b=><option key={b.id} value={b.id}>{b.title}</option>)}
-                </select>
+                <BookSearchSelect
+                  books={data.books}
+                  value={selBook}
+                  onChange={id => setSelBook(id)}
+                  placeholder="Search or select book…"
+                />
               </div>
               <div><div style={{fontSize:11,color:'#888',marginBottom:4}}>Qty</div>
                 <input type="number" min="1" value={selQty} onChange={e=>setSelQty(Number(e.target.value))} style={{width:'100%',border:'1px solid #ddd',borderRadius:5,padding:'8px',fontSize:13,outline:'none'}}/>
@@ -1519,9 +1871,12 @@ function EstimateForm({data,initial,nextNo,nowTime,onSave,onClose,onDelete}:{dat
           <div style={{marginTop:10,border:'1px solid #e0e0e0',borderRadius:6,padding:'12px'}}>
             <div style={{display:'grid',gridTemplateColumns:'2fr 1fr 1fr auto',gap:8,alignItems:'flex-end',marginBottom:8}}>
               <div><div style={{fontSize:11,color:'#888',marginBottom:4}}>Book</div>
-                <select value={selBook} onChange={e=>setSelBook(e.target.value)} style={{width:'100%',border:'1px solid #ddd',borderRadius:5,padding:'7px',fontSize:13,outline:'none'}}>
-                  <option value="">Select…</option>{data.books.map(b=><option key={b.id} value={b.id}>{b.title}</option>)}
-                </select>
+                <BookSearchSelect
+                  books={data.books}
+                  value={selBook}
+                  onChange={id => setSelBook(id)}
+                  placeholder="Search or select book…"
+                />
               </div>
               <div><div style={{fontSize:11,color:'#888',marginBottom:4}}>Qty</div>
                 <input type="number" min="1" value={selQty} onChange={e=>setSelQty(Number(e.target.value))} style={{width:'100%',border:'1px solid #ddd',borderRadius:5,padding:'7px',fontSize:13,outline:'none'}}/>
@@ -1744,9 +2099,12 @@ function DeliveryChallanForm({data,initial,nextNo,nowTime,onSave,onClose,onDelet
           <div style={{marginTop:10,border:'1px solid #e0e0e0',borderRadius:6,padding:'12px'}}>
             <div style={{display:'grid',gridTemplateColumns:'2fr 1fr auto',gap:8,alignItems:'flex-end',marginBottom:8}}>
               <div><div style={{fontSize:11,color:'#888',marginBottom:4}}>Book</div>
-                <select value={selBook} onChange={e=>setSelBook(e.target.value)} style={{width:'100%',border:'1px solid #ddd',borderRadius:5,padding:'8px',fontSize:13,outline:'none'}}>
-                  <option value="">Select book…</option>{data.books.map(b=><option key={b.id} value={b.id}>{b.title}</option>)}
-                </select>
+                <BookSearchSelect
+                  books={data.books}
+                  value={selBook}
+                  onChange={id => setSelBook(id)}
+                  placeholder="Search or select book…"
+                />
               </div>
               <div><div style={{fontSize:11,color:'#888',marginBottom:4}}>Qty</div>
                 <input type="number" min="1" value={selQty} onChange={e=>setSelQty(Number(e.target.value))} style={{width:'100%',border:'1px solid #ddd',borderRadius:5,padding:'8px',fontSize:13,outline:'none'}}/>
@@ -1974,9 +2332,12 @@ function SaleOrderForm({data,initial,nextNo,nowTime,onSave,onClose,onDelete}:{da
           <div style={{marginTop:10,border:'1px solid #e0e0e0',borderRadius:6,padding:'12px'}}>
             <div style={{display:'grid',gridTemplateColumns:'2fr 1fr 1fr auto',gap:8,alignItems:'flex-end',marginBottom:8}}>
               <div><div style={{fontSize:11,color:'#888',marginBottom:4}}>Book</div>
-                <select value={selBook} onChange={e=>setSelBook(e.target.value)} style={{width:'100%',border:'1px solid #ddd',borderRadius:5,padding:'7px',fontSize:13,outline:'none'}}>
-                  <option value="">Select…</option>{data.books.map(b=><option key={b.id} value={b.id}>{b.title}</option>)}
-                </select>
+                <BookSearchSelect
+                  books={data.books}
+                  value={selBook}
+                  onChange={id => setSelBook(id)}
+                  placeholder="Search or select book…"
+                />
               </div>
               <div><div style={{fontSize:11,color:'#888',marginBottom:4}}>Qty</div>
                 <input type="number" min="1" value={selQty} onChange={e=>setSelQty(Number(e.target.value))} style={{width:'100%',border:'1px solid #ddd',borderRadius:5,padding:'7px',fontSize:13,outline:'none'}}/>
@@ -2207,9 +2568,12 @@ function ProformaInvoiceForm({data,initial,nextRefNo,nowTime,onSave,onClose,onDe
           <div style={{marginTop:10,border:'1px solid #e0e0e0',borderRadius:6,padding:'12px',background:'#fafafa'}}>
             <div style={{display:'grid',gridTemplateColumns:'2fr 1fr 1fr auto',gap:8,alignItems:'flex-end',marginBottom:8}}>
               <div><div style={{fontSize:11,color:'#888',marginBottom:4}}>Book</div>
-                <select value={selBook} onChange={e=>setSelBook(e.target.value)} style={{width:'100%',border:'1px solid #ddd',borderRadius:5,padding:'7px',fontSize:13,outline:'none',background:'#fff'}}>
-                  <option value="">Select…</option>{data.books.map(b=><option key={b.id} value={b.id}>{b.title}</option>)}
-                </select>
+                <BookSearchSelect
+                  books={data.books}
+                  value={selBook}
+                  onChange={id => setSelBook(id)}
+                  placeholder="Search or select book…"
+                />
               </div>
               <div><div style={{fontSize:11,color:'#888',marginBottom:4}}>Qty</div>
                 <input type="number" min="1" value={selQty} onChange={e=>setSelQty(Number(e.target.value))} style={{width:'100%',border:'1px solid #ddd',borderRadius:5,padding:'7px',fontSize:13,outline:'none'}}/>
@@ -2571,16 +2935,23 @@ function PartyTxForm({ initial, partyName, nextNo, nowTime, books, onSave, onClo
           ))}
           <div style={{ border: '1.5px dashed #c5c0b4', borderRadius: 9, padding: 14, background: '#f9f8f3' }}>
             <div style={{ fontSize: 10, fontWeight: 700, color: '#8a9389', letterSpacing: '0.8px', marginBottom: 10 }}>ADD ITEM</div>
-            <div style={{ display: 'grid', gridTemplateColumns: '2fr 0.7fr 1fr 0.7fr auto', gap: 8, alignItems: 'flex-end' }}>
-              <div className="field" style={{ marginBottom: 0, gap: 3 }}><label style={{ fontSize: 9 }}>BOOK</label>
-                <select value={selBook} onChange={e => { setSelBook(e.target.value); const b = books.find(b => b.id === e.target.value); if (b) setSelPrice(b.price); }} style={{ height: 34 }}>
-                  <option value="">Select book…</option>{books.map(b => <option key={b.id} value={b.id}>{b.title}</option>)}
-                </select>
+            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(180px, 1fr) 72px 96px 72px auto', gap: 8, alignItems: 'flex-end' }}>
+              <div className="field" style={{ marginBottom: 0, gap: 3 }}><label style={{ fontSize: 9, whiteSpace: 'nowrap' }}>BOOK</label>
+                <BookSearchSelect
+                  books={books}
+                  value={selBook}
+                  onChange={bookId => {
+                    setSelBook(bookId);
+                    const b = books.find(x => x.id === bookId);
+                    if (b) setSelPrice(b.price);
+                  }}
+                  placeholder="Search or select book…"
+                />
               </div>
-              <div className="field" style={{ marginBottom: 0, gap: 3 }}><label style={{ fontSize: 9 }}>QTY</label><input type="number" min="1" value={selQty} style={{ height: 34 }} onChange={e => setSelQty(Number(e.target.value))} /></div>
-              <div className="field" style={{ marginBottom: 0, gap: 3 }}><label style={{ fontSize: 9 }}>PRICE (₹)</label><input type="number" min="0" value={selPrice} style={{ height: 34 }} onChange={e => setSelPrice(Number(e.target.value))} /></div>
-              <div className="field" style={{ marginBottom: 0, gap: 3 }}><label style={{ fontSize: 9 }}>DISC %</label><input type="number" min="0" max="100" value={selDisc} style={{ height: 34 }} onChange={e => setSelDisc(Number(e.target.value))} /></div>
-              <button className="btn primary" style={{ height: 34, padding: '0 12px' }} onClick={addItem}><Plus size={13} /></button>
+              <div className="field" style={{ marginBottom: 0, gap: 3 }}><label style={{ fontSize: 9, whiteSpace: 'nowrap', textAlign: 'center' }}>QTY</label><input type="number" min="1" value={selQty} style={{ height: 34, padding: '0 4px', textAlign: 'center', fontSize: 13, fontWeight: 600, color: '#1c3829' }} onChange={e => setSelQty(Number(e.target.value))} /></div>
+              <div className="field" style={{ marginBottom: 0, gap: 3 }}><label style={{ fontSize: 9, whiteSpace: 'nowrap', textAlign: 'center' }}>PRICE (₹)</label><input type="number" min="0" value={selPrice} style={{ height: 34, padding: '0 6px', textAlign: 'center', fontSize: 13, fontWeight: 600, color: '#1c3829' }} onChange={e => setSelPrice(Number(e.target.value))} /></div>
+              <div className="field" style={{ marginBottom: 0, gap: 3 }}><label style={{ fontSize: 9, whiteSpace: 'nowrap', textAlign: 'center' }}>DISC %</label><input type="number" min="0" max="100" value={selDisc} style={{ height: 34, padding: '0 4px', textAlign: 'center', fontSize: 13, fontWeight: 600, color: '#1c3829' }} onChange={e => setSelDisc(Number(e.target.value))} /></div>
+              <button className="btn primary" style={{ height: 34, padding: '0 12px', whiteSpace: 'nowrap' }} onClick={addItem}><Plus size={13} /></button>
             </div>
           </div>
         </div>
@@ -3721,23 +4092,34 @@ function Editor({form,data,pubs,onAddPub,onClose,onSave,onSaveBunch}:{form:Exclu
     {assignMode === 'single' && (
       <div style={{background:'#fff',padding:10,borderRadius:8,border:'1px solid #eae5d8',marginBottom:10}}>
         <div style={{fontSize:11,fontWeight:600,color:'#6f786f',marginBottom:7}}>Add individual title:</div>
-        <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
-          <select style={{flex:1,minWidth:120}} value={selClass} onChange={e=>{setSelClass(e.target.value);setSelPub('');setSelBook('');}}>
-            <option value="">Select Class</option>
+        <div style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'center'}}>
+          <select style={{flex:1,minWidth:120,height:34}} value={selClass} onChange={e=>{setSelClass(e.target.value);setSelPub('');setSelBook('');}}>
+            <option value="">All Classes</option>
             {'Pre Nur,Nursery,LKG,UKG'.split(',').concat(Array.from({length:12},(_,i)=>`Class ${i+1}`)).map(x=><option key={x}>{x}</option>)}
           </select>
-          <select style={{flex:1,minWidth:140}} value={selPub} onChange={e=>{setSelPub(e.target.value);setSelBook('');}} disabled={!selClass}>
-            <option value="">Select Publication</option>
-            {Array.from(new Set(data.books.filter(b=>b.className===selClass).map(b=>b.publication))).map(p=><option key={p}>{p}</option>)}
+          <select style={{flex:1,minWidth:130,height:34}} value={selPub} onChange={e=>{setSelPub(e.target.value);setSelBook('');}}>
+            <option value="">All Publications</option>
+            {Array.from(new Set(data.books.filter(b=>!selClass||b.className===selClass).map(b=>b.publication))).map(p=><option key={p}>{p}</option>)}
           </select>
-          <select style={{flex:1.5,minWidth:160}} value={selBook} onChange={e=>setSelBook(e.target.value)} disabled={!selPub}>
-            <option value="">Select Book</option>
-            {data.books.filter(b=>b.className===selClass&&b.publication===selPub).map(b=><option key={b.id} value={b.id}>{b.title} (₹{b.price})</option>)}
-          </select>
+          <div style={{flex:2,minWidth:220}}>
+            <BookSearchSelect
+              books={data.books.filter(b=>(!selClass||b.className===selClass)&&(!selPub||b.publication===selPub))}
+              value={selBook}
+              onChange={bookId => {
+                setSelBook(bookId);
+                const b = data.books.find(x => x.id === bookId);
+                if (b) {
+                  if (!selClass) setSelClass(b.className);
+                  if (!selPub) setSelPub(b.publication);
+                }
+              }}
+              placeholder="Search or select book…"
+            />
+          </div>
           <button
             type="button"
             className="btn primary"
-            style={{padding:'7px 14px',display:'flex',alignItems:'center',gap:5}}
+            style={{height:34,padding:'0 14px',display:'flex',alignItems:'center',gap:5}}
             disabled={!selBook}
             onClick={()=>{
               if(!values.allowedBooks?.includes(selBook)){
@@ -4029,10 +4411,12 @@ function BillingModal({ onClose, data }: { onClose: () => void, data: Dataset })
           <div className="form-grid no-print" style={{marginBottom: 20}}>
             <div className="field full">
                <label>Book</label>
-               <select value={selectedBook} onChange={e=>setSelectedBook(e.target.value)}>
-                 <option value="">Select a book...</option>
-                 {data.books.map(b=><option key={b.id} value={b.id}>{b.title} (₹{b.price})</option>)}
-               </select>
+               <BookSearchSelect
+                 books={data.books}
+                 value={selectedBook}
+                 onChange={id => setSelectedBook(id)}
+                 placeholder="Search or select a book…"
+               />
             </div>
             <div className="field"><label>Quantity</label><input type="number" min="1" value={qty} onChange={e=>setQty(Number(e.target.value))}/></div>
             <div className="field"><label>Item Discount (%)</label><input type="number" min="0" max="100" value={discount} onChange={e=>setDiscount(Number(e.target.value))}/></div>
